@@ -1,14 +1,17 @@
+
 import discord
 import aiohttp
-import asyncio
+ import asyncio
 import random
 import os
 
 # --- CONFIGURATION ---
-TOKEN = "_________"
+TOKEN = "____"
 OCR_API_KEY = "_______"
 POKENAME_BOT_ID = 874910942490677270
-SPAM_CHANNEL_ID = your spam channel ID # ID of the channel to send spam messages
+SPAM_CHANNEL_ID = 1476315512400122099 # ID of the channel to send spam messages
+spam_enabled = True
+MY_USER_ID = 1378954077462986772 # Replace with your MAIN account ID
 
 # List of messages to spam (to trigger spawns)
 SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
@@ -36,14 +39,41 @@ async def get_pokemon_name(image_url):
     return None
 
 async def spammer():
-    """Sends random messages to trigger spawns."""
+    global spam_enabled
     await client.wait_until_ready()
     channel = client.get_channel(SPAM_CHANNEL_ID)
+
     while not client.is_closed():
-        # Random interval between spam (don't spam too fast!)
-        await asyncio.sleep(random.uniform(2.0, 4.5))
-        await channel.send(random.choice(SPAM_MESSAGES))
-        print("Spammed a message...")
+        # Only send messages if the switch is ON
+        if spam_enabled and channel:
+            try:
+                await asyncio.sleep(random.uniform(2.5, 5.0))
+                await channel.send(random.choice(SPAM_MESSAGES))
+                print(".", end="", flush=True)
+            except Exception as e:
+                print(f"Spam Error: {e}")
+                await asyncio.sleep(10)
+        else:
+            # If disabled, wait a bit before checking again
+            await asyncio.sleep(5)
+
+@client.event
+async def on_message(message):
+    global spam_enabled
+
+    # --- THE REMOTE CONTROL ---
+    # Only listens to YOU (your main account)
+    if message.author.id == MY_USER_ID:
+        if message.content == ".stop":
+            spam_enabled = False
+            await message.channel.send("🚫 **Spammer Paused.** (Catching still active)")
+            print("\nRemote: Spammer Paused.")
+
+        elif message.content == ".start":
+            spam_enabled = True
+            await message.channel.send("✅ **Spammer Resumed.**")
+            print("\nRemote: Spammer Resumed.")
+
 
 @client.event
 async def on_ready():
@@ -71,7 +101,7 @@ async def on_message(message):
                 print(f"Identified: {name}. Waiting {delay:.2f}s to catch...")
                 await asyncio.sleep(delay)
 
-                await message.channel.send(f"c {name}")
+                await message.channel.send(f"<@716390085896962058> c {name}")
                 print(f"Caught {name}!")
 
 client.run(TOKEN)
