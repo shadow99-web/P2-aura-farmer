@@ -7,12 +7,12 @@ import ssl
 from corrections import pokemon_map
 
 # --- CONFIGURATION ---
-TOKEN = "acc_token "
+TOKEN = "your_acc_token"
 POKENAME_BOT_ID = 874910942490677270
+POKETWO_ID = 716390085896962058
 SPAM_CHANNEL_ID = 1459841583536148601
 MY_USER_ID = 1378954077462986772
 
-# Add all your OCR.space API keys here!
 OCR_KEYS = [
     "K81439983988957",
     "K89035013988957",
@@ -21,27 +21,19 @@ OCR_KEYS = [
 
 SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 spam_enabled = True
+captcha_hit = False  # New safety switch
 
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    # This timeout is better for mobile data in Mathura                                                                                             timeout = aiohttp.ClientTimeout(total=15, connect=5)
-
-    # force_close=True is vital for mobile data to prevent 'hanging' sockets
+    timeout = aiohttp.ClientTimeout(total=15, connect=5)
     connector = aiohttp.TCPConnector(ssl=False, force_close=True)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
         for key in OCR_KEYS:
             print(f"Attempting OCR | Key: ...{key[-4:]}")
-
-            payload = {
-                'apikey': key,
-                'url': image_url,
-                'language': 'eng',
-            }
-
+            payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
             try:
-                # Use a proper POST with a small delay to let the data connection 'warm up'
                 await asyncio.sleep(0.5)
                 async with session.post('https://api.ocr.space/parse/image', data=payload) as resp:
                     if resp.status == 200:
@@ -50,26 +42,19 @@ async def get_pokemon_name(image_url):
                             text = data['ParsedResults'][0]['ParsedText']
                             name = text.strip().split('\n')[0]
                             return "".join(c for c in name if c.isalpha())
-                        else:
-                            print(f"API Error on ...{key[-4:]}: {data.get('ErrorMessage')}")
-                    else:
-                        print(f"HTTP {resp.status} on ...{key[-4:]}")
             except Exception as e:
-                # This will print the EXACT error type (e.g., ClientConnectorError)
-                print(f"Network error on ...{key[-4:]}: {type(e).__name__} - {e}")
-
-            # Wait 2 seconds before trying the next key
+                print(f"Network error on key ...{key[-4:]}: {type(e).__name__}")
             await asyncio.sleep(2)
-
     return None
 
 async def spammer():
-    global spam_enabled
+    global spam_enabled, captcha_hit
     await client.wait_until_ready()
     channel = client.get_channel(SPAM_CHANNEL_ID)
 
     while not client.is_closed():
-        if spam_enabled and channel:
+        # Stop spamming if captcha is hit or disabled
+        if spam_enabled and channel and not captcha_hit:
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
                 print(".", end="", flush=True)
@@ -82,21 +67,40 @@ async def spammer():
 
 @client.event
 async def on_message(message):
-    global spam_enabled
+    global spam_enabled, captcha_hit
 
-    # 1. REMOTE CONTROL
+    # 1. REMOTE CONTROL & RESUME
     if message.author.id == MY_USER_ID:
         content = message.content.lower().strip()
         if content == ".stop":
             spam_enabled = False
             await message.channel.send("🚫 **Spammer Paused.**")
-            return
         elif content == ".start":
             spam_enabled = True
             await message.channel.send("✅ **Spammer Resumed.**")
+        elif content == ".resume":
+            captcha_hit = False
+            spam_enabled = True
+            await message.channel.send("🛠️ **Safety Reset: Bot Resumed.**")
+        return
+
+    # 2. CAPTCHA DETECTION
+    if message.author.id == POKETWO_ID:
+        msg_check = message.content.lower()
+        if "captcha" in msg_check or "verify" in msg_check:
+            captcha_hit = True
+            spam_enabled = False
+            # Send DM to Main Account
+            main_user = await client.fetch_user(MY_USER_ID)
+            await main_user.send(f"🚨 **CAPTCHA DETECTED!** Bot paused on: {client.user}\nSolve it and type `.resume` to continue.")
+            print("\n[!] EMERGENCY STOP: Captcha detected.")
             return
 
-    # 2. CATCHING LOGIC
+    # 3. GLOBAL SAFETY GATE
+    if captcha_hit:
+        return
+
+    # 4. CATCHING LOGIC
     if message.author.id == POKENAME_BOT_ID:
         image_url = None
         if message.attachments:
@@ -109,10 +113,12 @@ async def on_message(message):
             name = await get_pokemon_name(image_url)
 
             if name:
-            name_upper = name.upper()
+                name_upper = name.upper()
+                # Apply corrections from corrections.py
                 if name_upper in pokemon_map:
                     print(f"Correcting {name_upper} -> {pokemon_map[name_upper]}")
                     name = pokemon_map[name_upper]
+                
                 delay = random.uniform(2.0, 3.1)
                 print(f"Identified: {name}. Catching in {delay:.2f}s...")
                 await asyncio.sleep(delay)
@@ -123,7 +129,7 @@ async def on_message(message):
 
 @client.event
 async def on_ready():
-    print(f"Logged in as {client.user} - Multi-Key OCR Active")
+    print(f"Logged in as {client.user} - Multi-Key OCR & Captcha Protection Active")
     client.loop.create_task(spammer())
 
 client.run(TOKEN)
