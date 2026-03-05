@@ -69,20 +69,50 @@ async def spammer():
 async def on_message(message):
     global spam_enabled, captcha_hit
 
-    # 1. REMOTE CONTROL & RESUME
+    # 1. REMOTE CONTROL & UTILITIES (Listen to your Main ID only)
     if message.author.id == MY_USER_ID:
-        content = message.content.lower().strip()
-        if content == ".stop":
+        content = message.content.strip()
+        cmd = content.lower()
+
+        if cmd == ".stop":
             spam_enabled = False
             await message.channel.send("🚫 **Spammer Paused.**")
-        elif content == ".start":
+            return
+        elif cmd == ".start":
             spam_enabled = True
             await message.channel.send("✅ **Spammer Resumed.**")
-        elif content == ".resume":
+            return
+        elif cmd == ".resume":
             captcha_hit = False
             spam_enabled = True
             await message.channel.send("🛠️ **Safety Reset: Bot Resumed.**")
-        return
+            return
+
+        # --- NEW COMMAND: ADD CORRECTION (.add WRONG RIGHT) ---
+        if cmd.startswith(".add "):
+            try:
+                parts = content.split(" ")
+                wrong = parts[1]
+                right = " ".join(parts[2:]) # Handles names with spaces like 'BATTLE CYCLIZAR'
+                
+                # Update live dictionary
+                pokemon_map[wrong] = right
+                
+                # Append to corrections.py so it saves permanently
+                with open("corrections.py", "a") as f:
+                    f.write(f'\npokemon_map["{wrong}"] = "{right}"')
+                
+                await message.channel.send(f"✅ Added: `{wrong}` → `{right}`")
+                print(f"Correction Added: {wrong} -> {right}")
+            except Exception as e:
+                await message.channel.send("❌ Format: `.add WrongName RightName`")
+            return
+
+        # --- NEW COMMAND: CHECK POKETWO BALANCE ---
+        if cmd == ".check":
+            await message.channel.send("💰 **Checking Pokétwo Balance...**")
+            await message.channel.send("<@716390085896962058> bal")
+            return
 
     # 2. CAPTCHA DETECTION
     if message.author.id == POKETWO_ID:
@@ -90,10 +120,8 @@ async def on_message(message):
         if "captcha" in msg_check or "verify" in msg_check:
             captcha_hit = True
             spam_enabled = False
-            # Send DM to Main Account
             main_user = await client.fetch_user(MY_USER_ID)
-            await main_user.send(f"🚨 **CAPTCHA DETECTED!** Bot paused on: {client.user}\nSolve it and type `.resume` to continue.")
-            print("\n[!] EMERGENCY STOP: Captcha detected.")
+            await main_user.send(f"🚨 **CAPTCHA DETECTED!**\nSolve it and type `.resume` to continue.")
             return
 
     # 3. GLOBAL SAFETY GATE
