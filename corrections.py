@@ -12,5 +12,6 @@ pokemon_map = {
     "eoe": "OSHAWOTT",
     "rYNAMO": "TYNAMO",
     "PICNITE": "PIGNITE",
-    "DUCTRIO": "DUGTRIO"
+    "DUCTRIO": "DUGTRIO",
+    "CALARIANPONYTA":"GALARIAN PONYTA"
 }
