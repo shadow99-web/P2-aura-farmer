@@ -26,39 +26,36 @@ captcha_hit = False  # New safety switch
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    # We force a Google DNS resolver to bypass local mobile data lag
-    resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "8.8.4.4"])
+    # This is the direct numerical address of the OCR server.
+    # It bypasses the need for DNS lookups entirely.
+    OCR_IP = "https://172.67.161.161/parse/image" # Direct path
     
-    # Extremely tight timeouts to ensure we don't hang on a bad key
-    # 2s to connect, 5s to read the response.
+    # We use a standard connector that works on every Redmi 12C
+    connector = aiohttp.TCPConnector(ssl=False, force_close=True)
+    
+    # Tight 7s timeout: 2s to connect, 5s to read the data
     timeout = aiohttp.ClientTimeout(total=7, connect=2, sock_read=5)
-    
-    # force_close ensures the connection is completely reset every time
-    connector = aiohttp.TCPConnector(resolver=resolver, ssl=False, force_close=True)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        # We try the entire list of keys TWICE (Total 6 attempts)
-        for attempt in range(2): 
-            for key in OCR_KEYS:
-                print(f"Attempt {attempt+1} | Key: {key[:5]}...")
-                payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
-                try:
-                    async with session.post('https://api.ocr.space/parse/image', data=payload) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data.get('ParsedResults'):
-                                text = data['ParsedResults'][0]['ParsedText']
-                                name = text.strip().split('\n')[0]
-                                return "".join(c for c in name if c.isalpha())
-                except Exception:
-                    # Immediately jumps to the next key if a timeout occurs
-                    continue 
+        for key in OCR_KEYS:
+            print(f"Bypassing DNS | Key: {key[:5]}...")
             
-            # Short 1s wait before the second full pass of keys
-            await asyncio.sleep(1)
+            # We must provide the 'Host' header so the server knows where we want to go
+            headers = {"Host": "api.ocr.space"}
+            payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
             
-    return None
-
+            try:
+                async with session.post(OCR_IP, data=payload, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get('ParsedResults'):
+                            text = data['ParsedResults'][0]['ParsedText']
+                            name = text.strip().split('\n')[0]
+                            return "".join(c for c in name if c.isalpha())
+            except Exception as e:
+                print(f"Key {key[:5]} failed: {type(e).__name__}. Jumping to next...")
+                continue                
+    return None  
     
 async def spammer():
     global spam_enabled, captcha_hit
