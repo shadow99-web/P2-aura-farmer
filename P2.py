@@ -169,16 +169,25 @@ async def on_message(message):
 
         # --- AUTO-CONFIRM BUTTON ---
         if "Are you sure you want to confirm this trade?" in message.content:
-            for component in message.components:
-                for child in component.children:
-                    if getattr(child, "label", "") == "Confirm":
-                        try:
-                            delay = random.uniform(1.5, 2.5)
-                            await asyncio.sleep(delay) 
-                            await child.click()
-                            print(f"✅ Clicked Confirm after {delay:.2f}s")
-                        except Exception as e:
-                            print(f"❌ Button click failed: {e}")
+           
+            await asyncio.sleep(1.5)
+            
+            
+            if message.components:
+                for row in message.components:
+                    for child in row.children:
+                        if getattr(child, "label", "") == "Confirm":
+                            try:
+                                
+                                delay = random.uniform(1.2, 1.8)
+                                await asyncio.sleep(delay) 
+                                await child.click()
+                                print(f"✅ Trade Confirmed after {delay:.2f}s")
+                                return 
+                            except Exception as e:
+                                print(f"❌ Button click failed: {e}")
+
+
     # 3. GLOBAL SAFETY GATE
     if captcha_hit:
         return
