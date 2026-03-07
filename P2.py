@@ -114,6 +114,45 @@ async def on_message(message):
             await message.channel.send("<@716390085896962058> bal")
             return
 
+     # --- NEW MANUAL TRADE RELAY ---
+        if cmd.startswith(".trade"):
+            parts = content.split(" ")
+            
+            # .trade @user (Start trade)
+            if len(parts) == 2 and "<@" in parts[1]:
+                target = parts[1]
+                await message.channel.send(f"<@716390085896962058> trade {target}")
+                return
+
+            # .trade add [anything] (Flexible relay)
+            if len(parts) >= 3 and parts[1] == "add":
+                # This grabs everything after '.trade add '
+                raw_input = content[11:] 
+                await message.channel.send(f"<@716390085896962058> trade add {raw_input}")
+                return
+
+            # .trade confirm (Manual trigger)
+            if "confirm" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade confirm")
+                return
+
+            # .trade x (Cancel)
+            if " x" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade cancel")
+                return
+
+    # 2. AUTO-CLICK POKETWO CONFIRM BUTTON
+    if message.author.id == POKETWO_ID:
+        # Check for the confirmation message from Poketwo
+        if "Are you sure you want to confirm this trade?" in message.content:
+            for component in message.components:
+                for child in component.children:
+                    # Look for the "Confirm" label on the button
+                    if getattr(child, "label", "") == "Confirm":
+                        await asyncio.sleep(1.5) # Human-like delay
+                        await child.click()
+                        print("✅ clicked the Confirm button.")
+
     # 2. CAPTCHA DETECTION
     if message.author.id == POKETWO_ID:
         msg_check = message.content.lower()
