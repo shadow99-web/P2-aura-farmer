@@ -151,6 +151,14 @@ async def on_message(message):
                         await asyncio.sleep(1.5) # Human-like delay
                         await child.click()
                         print("✅ clicked the Confirm button.")
+                        # Updated clicking logic for P2.py
+try:
+    await asyncio.sleep(random.uniform(1.5, 2.0)) 
+    await child.click()
+    print("✅ clicked the 'Confirm' button.")
+except Exception as e:
+    print(f"Click failed: {e}")
+    
 
     # 2. CAPTCHA DETECTION
     if message.author.id == POKETWO_ID:
