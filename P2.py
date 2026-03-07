@@ -26,7 +26,7 @@ captcha_hit = False  # New safety switch
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    timeout = aiohttp.ClientTimeout(total=15, connect=5)
+    timeout = aiohttp.ClientTimeout(total=8, sock_connect=3, sock_read=5)
     connector = aiohttp.TCPConnector(ssl=False, force_close=True)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
@@ -34,7 +34,6 @@ async def get_pokemon_name(image_url):
             print(f"Attempting OCR | Key: ...{key[-4:]}")
             payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
             try:
-                await asyncio.sleep(0.5)
                 async with session.post('https://api.ocr.space/parse/image', data=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -44,9 +43,9 @@ async def get_pokemon_name(image_url):
                             return "".join(c for c in name if c.isalpha())
             except Exception as e:
                 print(f"Network error on key ...{key[-4:]}: {type(e).__name__}")
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
     return None
-
+    
 async def spammer():
     global spam_enabled, captcha_hit
     await client.wait_until_ready()
