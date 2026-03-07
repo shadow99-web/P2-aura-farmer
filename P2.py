@@ -26,36 +26,40 @@ captcha_hit = False  # New safety switch
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    # This is the direct numerical address of the OCR server.
-    # It bypasses the need for DNS lookups entirely.
-    OCR_IP = "https://172.67.161.161/parse/image" # Direct path
+    # Standard URL - This is the only way to avoid the SSLError
+    url = "https://api.ocr.space/parse/image"
     
-    # We use a standard connector that works on every Redmi 12C
-    connector = aiohttp.TCPConnector(ssl=False, force_close=True)
+    # We use a standard connector but enable 'happy_eyeballs'
+    # This helps mobile data find the fastest path to the server
+    connector = aiohttp.TCPConnector(ssl=False, force_close=True, happy_eyeballs_delay=0.25)
     
-    # Tight 7s timeout: 2s to connect, 5s to read the data
-    timeout = aiohttp.ClientTimeout(total=7, connect=2, sock_read=5)
+    # Adjusted timeouts for Mathura mobile data:
+    # 5s to find the server (Connect), 10s to get the results back (Total)
+    timeout = aiohttp.ClientTimeout(total=6, connect=3, sock_read=3.5)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
         for key in OCR_KEYS:
-            print(f"Bypassing DNS | Key: {key[:5]}...")
-            
-            # We must provide the 'Host' header so the server knows where we want to go
-            headers = {"Host": "api.ocr.space"}
+            print(f"Scanning | Key: {key[:5]}...")
             payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
             
             try:
-                async with session.post(OCR_IP, data=payload, headers=headers) as resp:
+                # We add a tiny sleep to prevent 'Socket Hanging' on Redmi devices
+                await asyncio.sleep(0.2)
+                async with session.post(url, data=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         if data.get('ParsedResults'):
                             text = data['ParsedResults'][0]['ParsedText']
                             name = text.strip().split('\n')[0]
                             return "".join(c for c in name if c.isalpha())
+                    else:
+                        print(f"Key {key[:5]} - Server Busy ({resp.status})")
             except Exception as e:
-                print(f"Key {key[:5]} failed: {type(e).__name__}. Jumping to next...")
-                continue                
-    return None  
+                # This will now catch the error and move to Key 2 or 3
+                print(f"Key {key[:5]} failed: {type(e).__name__}")
+                continue
+                
+    return None
     
 async def spammer():
     global spam_enabled, captcha_hit
