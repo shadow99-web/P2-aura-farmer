@@ -92,7 +92,7 @@ async def on_message(message):
         if cmd.startswith(".add "):
             try:
                 parts = content.split(" ")
-                wrong = parts[1]
+                wrong = parts[1].upper()
                 right = " ".join(parts[2:]) # Handles names with spaces like 'BATTLE CYCLIZAR'
                 
                 # Update live dictionary
