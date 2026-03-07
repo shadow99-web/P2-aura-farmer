@@ -26,25 +26,39 @@ captcha_hit = False  # New safety switch
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    timeout = aiohttp.ClientTimeout(total=8, sock_connect=3, sock_read=5)
-    connector = aiohttp.TCPConnector(ssl=False, force_close=True)
+    # We force a Google DNS resolver to bypass local mobile data lag
+    resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "8.8.4.4"])
+    
+    # Extremely tight timeouts to ensure we don't hang on a bad key
+    # 2s to connect, 5s to read the response.
+    timeout = aiohttp.ClientTimeout(total=7, connect=2, sock_read=5)
+    
+    # force_close ensures the connection is completely reset every time
+    connector = aiohttp.TCPConnector(resolver=resolver, ssl=False, force_close=True)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        for key in OCR_KEYS:
-            print(f"Attempting OCR | Key: ...{key[-4:]}")
-            payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
-            try:
-                async with session.post('https://api.ocr.space/parse/image', data=payload) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if isinstance(data, dict) and data.get('ParsedResults'):
-                            text = data['ParsedResults'][0]['ParsedText']
-                            name = text.strip().split('\n')[0]
-                            return "".join(c for c in name if c.isalpha())
-            except Exception as e:
-                print(f"Network error on key ...{key[-4:]}: {type(e).__name__}")
-            await asyncio.sleep(0.5)
+        # We try the entire list of keys TWICE (Total 6 attempts)
+        for attempt in range(2): 
+            for key in OCR_KEYS:
+                print(f"Attempt {attempt+1} | Key: {key[:5]}...")
+                payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
+                try:
+                    async with session.post('https://api.ocr.space/parse/image', data=payload) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if data.get('ParsedResults'):
+                                text = data['ParsedResults'][0]['ParsedText']
+                                name = text.strip().split('\n')[0]
+                                return "".join(c for c in name if c.isalpha())
+                except Exception:
+                    # Immediately jumps to the next key if a timeout occurs
+                    continue 
+            
+            # Short 1s wait before the second full pass of keys
+            await asyncio.sleep(1)
+            
     return None
+
     
 async def spammer():
     global spam_enabled, captcha_hit
