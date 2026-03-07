@@ -140,36 +140,30 @@ async def on_message(message):
                 await message.channel.send(f"<@716390085896962058> trade cancel")
                 return
 
-    # 2. AUTO-CLICK POKETWO CONFIRM BUTTON
-    if message.author.id == POKETWO_ID:
-        # Check for the confirmation message from Poketwo
-        if "Are you sure you want to confirm this trade?" in message.content:
-            for component in message.components:
-                for child in component.children:
-                    # Look for the "Confirm" label on the button
-                    if getattr(child, "label", "") == "Confirm":
-                        await asyncio.sleep(1.5) # Human-like delay
-                        await child.click()
-                        print("✅ clicked the Confirm button.")
-                        # Updated clicking logic for P2.py
-try:
-    await asyncio.sleep(random.uniform(1.5, 2.0)) 
-    await child.click()
-    print("✅ clicked the 'Confirm' button.")
-except Exception as e:
-    print(f"Click failed: {e}")
-    
-
-    # 2. CAPTCHA DETECTION
+      # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
     if message.author.id == POKETWO_ID:
         msg_check = message.content.lower()
+
+        # --- CAPTCHA DETECTION ---
         if "captcha" in msg_check or "verify" in msg_check:
             captcha_hit = True
             spam_enabled = False
             main_user = await client.fetch_user(MY_USER_ID)
-            await main_user.send(f"🚨 **CAPTCHA DETECTED!**\nSolve it and type `.resume` to continue.")
+            await main_user.send(f"🚨 **CAPTCHA DETECTED!** Solve it and type `.resume`.")
             return
 
+        # --- AUTO-CONFIRM BUTTON ---
+        if "Are you sure you want to confirm this trade?" in message.content:
+            for component in message.components:
+                for child in component.children:
+                    if getattr(child, "label", "") == "Confirm":
+                        try:
+                            delay = random.uniform(1.5, 2.5)
+                            await asyncio.sleep(delay) 
+                            await child.click()
+                            print(f"✅ Clicked Confirm after {delay:.2f}s")
+                        except Exception as e:
+                            print(f"❌ Button click failed: {e}")
     # 3. GLOBAL SAFETY GATE
     if captcha_hit:
         return
