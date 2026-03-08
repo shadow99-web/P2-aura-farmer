@@ -157,35 +157,44 @@ async def on_message(message):
             print("\n🚨 CAPTCHA DETECTED! Bot Paused.")
             return
 
-                        # --- AUTO-CONFIRM BUTTON (Hardened for App Responses) ---
-        # 1. Check if the message is from Pokétwo (ID: 716390085896962058)
-        if message.author.id == 716390085896962058:
-            # 2. Look for the specific trade text
-            if "Are you sure you want to confirm this trade?" in message.content:
-                print("Trade prompt detected! Waiting for buttons to sync...")
-                
-                # 3. Give the hostel network time to load components
-                for attempt in range(4):
-                    await asyncio.sleep(0.6)
+                            # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
+    if message.author.id == POKETWO_ID:
+        is_trade_msg = False
+        target_text = "Are you sure you want to confirm this trade?"
+
+        # 1. Check Plain Text (Safety Fallback)
+        if target_text in message.content:
+            is_trade_msg = True
+        
+        # 2. Check Embeds (This is what you need!)
+        if not is_trade_msg and message.embeds:
+            for embed in message.embeds:
+                if embed.description and target_text in embed.description:
+                    is_trade_msg = True
+                    break
+
+        if is_trade_msg:
+            print("🔔 Trade Embed Detected! Syncing components...")
+            # We try to find the button up to 5 times (0.6s intervals)
+            for attempt in range(5):
+                await asyncio.sleep(0.6)
+                try:
                     
-                    # 4. Refresh the message to "see" the buttons
-                    try:
-                        msg = await message.channel.fetch_message(message.id)
-                        if msg.components:
-                            for row in msg.components:
-                                for child in row.children:
-                                    if getattr(child, "label", "") == "Confirm":
-                                        # Human-like delay (1.4s - 1.9s)
-                                        delay = random.uniform(1.4, 1.9)
-                                        await asyncio.sleep(delay)
-                                        await child.click()
-                                        print(f"✅ Trade Confirmed on attempt {attempt+1}!")
-                                        return
-                        print(f"Attempt {attempt+1}: Buttons not found yet...")
-                    except Exception as e:
-                        print(f"Error fetching components: {e}")
-
-
+                    msg = await message.channel.fetch_message(message.id)
+                    if msg.components:
+                        for row in msg.components:
+                            for child in row.children:
+                                if getattr(child, "label", "") == "Confirm":
+                                    # Human-like delay for safety
+                                    delay = random.uniform(1.3, 1.8)
+                                    await asyncio.sleep(delay)
+                                    await child.click()
+                                    print(f"✅ Trade Confirmed on attempt {attempt+1}!")
+                                    return
+                    print(f"Attempt {attempt+1}: Buttons not attached to embed yet...")
+                except Exception as e:
+                    print(f"Fetch Error: {e}")
+            print("❌ Failed to click: Buttons never appeared in the embed.")
 
     # 3. GLOBAL SAFETY GATE
     if captcha_hit:
