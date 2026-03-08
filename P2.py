@@ -83,7 +83,27 @@ async def spammer():
 async def on_message(message):
     global spam_enabled, captcha_hit
 
-    # 1. REMOTE CONTROL & UTILITIES
+    
+
+        if cmd.startswith(".trade"):
+            parts = content.split(" ")
+            if len(parts) == 2 and "<@" in parts[1]:
+                await message.channel.send(f"<@716390085896962058> trade {parts[1]}")
+                return
+            if len(parts) >= 3 and parts[1] == "add":
+                raw_input = content[11:] 
+                await message.channel.send(f"<@716390085896962058> trade add {raw_input}")
+                return
+            if "confirm" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade confirm")
+                return
+            if " x" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade cancel")
+                return
+
+    # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
+    if message.author.id == POKETWO_ID:
+        msg_check = message.content.lower    # 1. REMOTE CONTROL & UTILITIES
     if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
@@ -115,9 +135,8 @@ async def on_message(message):
                 await message.channel.send("❌ Format: `.add Wrong Right`")
             return
             
-            if cmd.startswith(".s "):
-            # This takes everything after '.s ' and sends it
-            
+        
+        if cmd.startswith(".s "):
             relay_content = content[3:] 
             await message.channel.send(relay_content)
             return
@@ -126,26 +145,7 @@ async def on_message(message):
             await message.channel.send("💰 **Checking Pokétwo Balance...**")
             await message.channel.send("<@716390085896962058> bal")
             return
-
-        if cmd.startswith(".trade"):
-            parts = content.split(" ")
-            if len(parts) == 2 and "<@" in parts[1]:
-                await message.channel.send(f"<@716390085896962058> trade {parts[1]}")
-                return
-            if len(parts) >= 3 and parts[1] == "add":
-                raw_input = content[11:] 
-                await message.channel.send(f"<@716390085896962058> trade add {raw_input}")
-                return
-            if "confirm" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade confirm")
-                return
-            if " x" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade cancel")
-                return
-
-    # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
-    if message.author.id == POKETWO_ID:
-        msg_check = message.content.lower()
+()
 
         # --- CAPTCHA DETECTION ---
         if "captcha" in msg_check or "verify" in msg_check:
