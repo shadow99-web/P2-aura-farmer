@@ -83,7 +83,7 @@ async def spammer():
 async def on_message(message):
     global spam_enabled, captcha_hit
 
-    # 1. REMOTE CONTROL & UTILITIES (Listen to your Main ID only)
+    # 1. REMOTE CONTROL & UTILITIES
     if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
@@ -102,60 +102,41 @@ async def on_message(message):
             await message.channel.send("🛠️ **Safety Reset: Bot Resumed.**")
             return
 
-        # --- NEW COMMAND: ADD CORRECTION (.add WRONG RIGHT) ---
         if cmd.startswith(".add "):
             try:
                 parts = content.split(" ")
                 wrong = parts[1].upper()
-                right = " ".join(parts[2:]) # Handles names with spaces like 'BATTLE CYCLIZAR'
-                
-                # Update live dictionary
+                right = " ".join(parts[2:])
                 pokemon_map[wrong] = right
-                
-                # Append to corrections.py so it saves permanently
                 with open("corrections.py", "a") as f:
                     f.write(f'\npokemon_map["{wrong}"] = "{right}"')
-                
                 await message.channel.send(f"✅ Added: `{wrong}` → `{right}`")
-                print(f"Correction Added: {wrong} -> {right}")
-            except Exception as e:
-                await message.channel.send("❌ Format: `.add WrongName RightName`")
+            except:
+                await message.channel.send("❌ Format: `.add Wrong Right`")
             return
 
-        # --- NEW COMMAND: CHECK POKETWO BALANCE ---
         if cmd == ".check":
             await message.channel.send("💰 **Checking Pokétwo Balance...**")
             await message.channel.send("<@716390085896962058> bal")
             return
 
-     # --- NEW MANUAL TRADE RELAY ---
         if cmd.startswith(".trade"):
             parts = content.split(" ")
-            
-            # .trade @user (Start trade)
             if len(parts) == 2 and "<@" in parts[1]:
-                target = parts[1]
-                await message.channel.send(f"<@716390085896962058> trade {target}")
+                await message.channel.send(f"<@716390085896962058> trade {parts[1]}")
                 return
-
-            # .trade add [anything] (Flexible relay)
             if len(parts) >= 3 and parts[1] == "add":
-                # This grabs everything after '.trade add '
                 raw_input = content[11:] 
                 await message.channel.send(f"<@716390085896962058> trade add {raw_input}")
                 return
-
-            # .trade confirm (Manual trigger)
             if "confirm" in cmd:
                 await message.channel.send(f"<@716390085896962058> trade confirm")
                 return
-
-            # .trade x (Cancel)
             if " x" in cmd:
                 await message.channel.send(f"<@716390085896962058> trade cancel")
                 return
 
-      # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
+    # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
     if message.author.id == POKETWO_ID:
         msg_check = message.content.lower()
 
@@ -163,26 +144,21 @@ async def on_message(message):
         if "captcha" in msg_check or "verify" in msg_check:
             captcha_hit = True
             spam_enabled = False
-            main_user = client.get_user(MY_USER_ID) 
-if main_user is None:
-    # If the bot hasn't "seen" you yet, it will look through its cache
-    main_user = await client.get_user(MY_USER_ID)
-
-# Send the DM
-await main_user.send(f"🚨 **CAPTCHA DETECTED!** Solve it and type `.resume` to continue.")
+            main_user = client.get_user(MY_USER_ID)
+            if main_user:
+                await main_user.send(f"🚨 **CAPTCHA DETECTED!** Solve it and type `.resume`.")
+            print("\n🚨 CAPTCHA DETECTED! Bot Paused.")
+            return
 
         # --- AUTO-CONFIRM BUTTON ---
         if "Are you sure you want to confirm this trade?" in message.content:
-           
-            await asyncio.sleep(1.5)
-            
-            
+            await asyncio.sleep(1.2) 
+
             if message.components:
                 for row in message.components:
                     for child in row.children:
                         if getattr(child, "label", "") == "Confirm":
                             try:
-                                
                                 delay = random.uniform(1.2, 1.8)
                                 await asyncio.sleep(delay) 
                                 await child.click()
