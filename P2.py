@@ -157,22 +157,33 @@ async def on_message(message):
             print("\n🚨 CAPTCHA DETECTED! Bot Paused.")
             return
 
-        # --- AUTO-CONFIRM BUTTON ---
+                # --- AUTO-CONFIRM BUTTON (Hardened for Mobile Data) ---
         if "Are you sure you want to confirm this trade?" in message.content:
-            await asyncio.sleep(1.2) 
-
-            if message.components:
-                for row in message.components:
-                    for child in row.children:
-                        if getattr(child, "label", "") == "Confirm":
-                            try:
-                                delay = random.uniform(1.2, 1.8)
-                                await asyncio.sleep(delay) 
-                                await child.click()
-                                print(f"✅ Trade Confirmed after {delay:.2f}s")
-                                return 
-                            except Exception as e:
-                                print(f"❌ Button click failed: {e}")
+            print("Trade prompt detected. Waiting for buttons...")
+            
+            # We try to find the button up to 5 times (0.5s intervals)
+            # This handles the 'empty components' bug on slow networks
+            for attempt in range(5):
+                await asyncio.sleep(0.5)
+                # Re-fetch the message from the cache to see updated components
+                msg = await message.channel.fetch_message(message.id)
+                
+                if msg.components:
+                    for row in msg.components:
+                        for child in row.children:
+                            if getattr(child, "label", "") == "Confirm":
+                                try:
+                                    # Human-like delay (1.2s - 1.8s)
+                                    delay = random.uniform(1.2, 1.8)
+                                    await asyncio.sleep(delay) 
+                                    await child.click()
+                                    print(f"✅ Trade Confirmed on attempt {attempt+1}!")
+                                    return 
+                                except Exception as e:
+                                    print(f"❌ Click failed: {e}")
+                                    return
+                print(f"Attempt {attempt+1}: No buttons found yet...")
+            print("❌ Failed to find Confirm button after 5 attempts.")
 
 
     # 3. GLOBAL SAFETY GATE
