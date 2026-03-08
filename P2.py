@@ -163,9 +163,13 @@ async def on_message(message):
         if "captcha" in msg_check or "verify" in msg_check:
             captcha_hit = True
             spam_enabled = False
-            main_user = await client.fetch_user(MY_USER_ID)
-            await main_user.send(f"🚨 **CAPTCHA DETECTED!** Solve it and type `.resume`.")
-            return
+            main_user = client.get_user(MY_USER_ID) 
+if main_user is None:
+    # If the bot hasn't "seen" you yet, it will look through its cache
+    main_user = await client.get_user(MY_USER_ID)
+
+# Send the DM
+await main_user.send(f"🚨 **CAPTCHA DETECTED!** Solve it and type `.resume` to continue.")
 
         # --- AUTO-CONFIRM BUTTON ---
         if "Are you sure you want to confirm this trade?" in message.content:
