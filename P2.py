@@ -114,6 +114,13 @@ async def on_message(message):
             except:
                 await message.channel.send("❌ Format: `.add Wrong Right`")
             return
+            
+            if cmd.startswith(".s "):
+            # This takes everything after '.s ' and sends it
+            
+            relay_content = content[3:] 
+            await message.channel.send(relay_content)
+            return
 
         if cmd == ".check":
             await message.channel.send("💰 **Checking Pokétwo Balance...**")
