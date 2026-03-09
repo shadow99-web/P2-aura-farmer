@@ -26,25 +26,23 @@ captcha_hit = False  # New safety switch
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
-    # Standard URL - This is the only way to avoid the SSLError
     url = "https://api.ocr.space/parse/image"
     
-    # We use a standard connector but enable 'happy_eyeballs'
-    # This helps mobile data find the fastest path to the server
-    connector = aiohttp.TCPConnector(ssl=False, force_close=True, happy_eyeballs_delay=0.25)
+    connector = aiohttp.TCPConnector(
+        ssl=False, 
+        force_close=True, 
+        enable_cleanup_closed=True,
+        limit_per_host=1,
+        happy_eyeballs_delay=0.15 # Added for faster mobile data routing
+    )
     
-    # Adjusted timeouts for Mathura mobile data:
-    # 5s to find the server (Connect), 10s to get the results back (Total)
-    timeout = aiohttp.ClientTimeout(total=6, connect=3, sock_read=3.5)
+    
+    timeout = aiohttp.ClientTimeout(total=6.5, connect=2, sock_read=4)
 
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
         for key in OCR_KEYS:
-            print(f"Scanning | Key: {key[:5]}...")
-            payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
-            
             try:
-                # We add a tiny sleep to prevent 'Socket Hanging' on Redmi devices
-                await asyncio.sleep(0.2)
+                payload = {'apikey': key, 'url': image_url, 'language': 'eng'}
                 async with session.post(url, data=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -52,14 +50,12 @@ async def get_pokemon_name(image_url):
                             text = data['ParsedResults'][0]['ParsedText']
                             name = text.strip().split('\n')[0]
                             return "".join(c for c in name if c.isalpha())
-                    else:
-                        print(f"Key {key[:5]} - Server Busy ({resp.status})")
-            except Exception as e:
-                # This will now catch the error and move to Key 2 or 3
-                print(f"Key {key[:5]} failed: {type(e).__name__}")
-                continue
-                
+            except Exception:
+                # Instant switch on any lag
+                print(f"⏩ Key {key[:5]} lagging... switching.")
+                continue 
     return None
+
     
 async def spammer():
     global spam_enabled, captcha_hit
