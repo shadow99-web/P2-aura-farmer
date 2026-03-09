@@ -83,27 +83,7 @@ async def spammer():
 async def on_message(message):
     global spam_enabled, captcha_hit
 
-    
-
-        if cmd.startswith(".trade"):
-            parts = content.split(" ")
-            if len(parts) == 2 and "<@" in parts[1]:
-                await message.channel.send(f"<@716390085896962058> trade {parts[1]}")
-                return
-            if len(parts) >= 3 and parts[1] == "add":
-                raw_input = content[11:] 
-                await message.channel.send(f"<@716390085896962058> trade add {raw_input}")
-                return
-            if "confirm" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade confirm")
-                return
-            if " x" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade cancel")
-                return
-
-    # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
-    if message.author.id == POKETWO_ID:
-        msg_check = message.content.lower    # 1. REMOTE CONTROL & UTILITIES
+    # 1. REMOTE CONTROL & UTILITIES
     if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
@@ -121,8 +101,26 @@ async def on_message(message):
             spam_enabled = True
             await message.channel.send("🛠️ **Safety Reset: Bot Resumed.**")
             return
+        elif cmd == ".ping":
+            latency = round(client.latency * 1000)
+            await message.channel.send(f"🏓 **Pong!** Latency: `{latency}ms`")
+            return
+        
+        # --- NEW COMMAND: RESET ---
+        elif cmd == ".reset":
+            captcha_hit = False
+            spam_enabled = True
+            # This force-clears any hanging tasks in the console
+            print("\n♻️ Manual System Reset Triggered...")
+            await message.channel.send("♻️ **Bot state and tasks have been reset.**")
+            return
 
-        if cmd.startswith(".add "):
+        elif cmd.startswith(".s "):
+            relay_content = content[3:] 
+            await message.channel.send(relay_content)
+            return
+
+        elif cmd.startswith(".add "):
             try:
                 parts = content.split(" ")
                 wrong = parts[1].upper()
@@ -134,25 +132,20 @@ async def on_message(message):
             except:
                 await message.channel.send("❌ Format: `.add Wrong Right`")
             return
-            
-        
-        if cmd.startswith(".s "):
-            relay_content = content[3:] 
-            await message.channel.send(relay_content)
-            return
-                    # --- NEW COMMAND: PING (.ping) ---
-        if cmd == ".ping":
-            # Calculate the time it takes for the message to reach you
-            latency = round(client.latency * 1000)
-            await message.channel.send(f"🏓 **Pong!** Latency: `{latency}ms`")
-            return
-            
 
-        if cmd == ".check":
-            await message.channel.send("💰 **Checking Pokétwo Balance...**")
-            await message.channel.send("<@716390085896962058> bal")
+        elif cmd.startswith(".trade"):
+            # Consolidated Trade Logic
+            if "confirm" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade confirm")
+            elif "add" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
+            elif " x" in cmd:
+                await message.channel.send(f"<@716390085896962058> trade cancel")
             return
-()
+
+    # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
+    if message.author.id == POKETWO_ID:
+        msg_check = message.content.lower()
 
         # --- CAPTCHA DETECTION ---
         if "captcha" in msg_check or "verify" in msg_check:
@@ -164,44 +157,35 @@ async def on_message(message):
             print("\n🚨 CAPTCHA DETECTED! Bot Paused.")
             return
 
-                            # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
-    if message.author.id == POKETWO_ID:
-        is_trade_msg = False
+        # --- AGGRESSIVE TRADE CONFIRM ---
         target_text = "Are you sure you want to confirm this trade?"
-
-        # 1. Check Plain Text (Safety Fallback)
-        if target_text in message.content:
-            is_trade_msg = True
-        
-        # 2. Check Embeds (This is what you need!)
-        if not is_trade_msg and message.embeds:
-            for embed in message.embeds:
-                if embed.description and target_text in embed.description:
-                    is_trade_msg = True
+        is_trade = target_text in message.content
+        if not is_trade and message.embeds:
+            for eb in message.embeds:
+                if eb.description and target_text in eb.description:
+                    is_trade = True
                     break
 
-        if is_trade_msg:
-            print("🔔 Trade Embed Detected! Syncing components...")
-            # We try to find the button up to 5 times (0.6s intervals)
-            for attempt in range(5):
-                await asyncio.sleep(0.6)
+        if is_trade:
+            print("🔔 Trade Found! Waiting for buttons...")
+            # We check 8 times because mobile data is inconsistent
+            for attempt in range(8):
+                await asyncio.sleep(0.5) 
                 try:
-                    
+                    # FORCE FETCH from Discord to see the buttons
                     msg = await message.channel.fetch_message(message.id)
                     if msg.components:
                         for row in msg.components:
-                            for child in row.children:
-                                if getattr(child, "label", "") == "Confirm":
-                                    # Human-like delay for safety
-                                    delay = random.uniform(1.3, 1.8)
-                                    await asyncio.sleep(delay)
-                                    await child.click()
-                                    print(f"✅ Trade Confirmed on attempt {attempt+1}!")
+                            for btn in row.children:
+                                if getattr(btn, "label", "") == "Confirm":
+                                    await asyncio.sleep(0.5) # Minimum safe delay
+                                    await btn.click()
+                                    print(f"✅ SUCCESS: Clicked on attempt {attempt+1}")
                                     return
-                    print(f"Attempt {attempt+1}: Buttons not attached to embed yet...")
                 except Exception as e:
-                    print(f"Fetch Error: {e}")
-            print("❌ Failed to click: Buttons never appeared in the embed.")
+                    print(f"Attempt {attempt+1} sync failed: {e}")
+            return
+
 
     # 3. GLOBAL SAFETY GATE
     if captcha_hit:
