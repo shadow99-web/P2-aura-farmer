@@ -84,6 +84,7 @@ async def on_message(message):
         content = message.content.strip()
         cmd = content.lower()
 
+        # --- Basic Controls ---
         if cmd == ".stop":
             spam_enabled = False
             await message.channel.send("🚫 **Spammer Paused.**")
@@ -101,21 +102,37 @@ async def on_message(message):
             latency = round(client.latency * 1000)
             await message.channel.send(f"🏓 **Pong!** Latency: `{latency}ms`")
             return
-        
-        # --- NEW COMMAND: RESET ---
         elif cmd == ".reset":
             captcha_hit = False
             spam_enabled = True
-            # This force-clears any hanging tasks in the console
-            print("\n♻️ Manual System Reset Triggered...")
-            await message.channel.send("♻️ **Bot state and tasks have been reset.**")
+            await message.channel.send("♻️ **System Overhaul Complete.**")
             return
 
+        # --- FIXED: The .check command ---
+        elif cmd == ".check":
+            await message.channel.send("<@716390085896962058> bal")
+            return
+
+        # --- Relay (.s info, .s p) ---
         elif cmd.startswith(".s "):
-            relay_content = content[3:] 
-            await message.channel.send(relay_content)
+            await message.channel.send(content[3:])
             return
 
+        # --- FIXED: Trade Logic with correct slicing ---
+        elif cmd.startswith(".trade"):
+            if "confirm" in cmd:
+                await message.channel.send("<@716390085896962058> trade confirm")
+            elif "add" in cmd:
+                # skips '.trade add ' (11 chars) to send the clean command
+                await message.channel.send(f"<@716390085896962058> trade add {content[11:]}")
+            elif " x" in cmd:
+                await message.channel.send("<@716390085896962058> trade cancel")
+            else:
+                # handles '.trade @user' (skips 7 chars: '.trade ')
+                await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
+            return
+
+        # --- Corrections ---
         elif cmd.startswith(".add "):
             try:
                 parts = content.split(" ")
@@ -129,15 +146,6 @@ async def on_message(message):
                 await message.channel.send("❌ Format: `.add Wrong Right`")
             return
 
-        elif cmd.startswith(".trade"):
-            # Consolidated Trade Logic
-            if "confirm" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade confirm")
-            elif "add" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
-            elif " x" in cmd:
-                await message.channel.send(f"<@716390085896962058> trade cancel")
-            return
 
     # 2. POKETWO INTERACTION (Captcha & Trade Buttons)
     if message.author.id == POKETWO_ID:
