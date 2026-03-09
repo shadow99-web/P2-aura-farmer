@@ -23,7 +23,6 @@ SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 spam_enabled = True
 captcha_hit = False  # New safety switch
 
-intents = discord.Intents.all()
 client = discord.Client(self_bot=True)
 
 async def get_pokemon_name(image_url):
