@@ -4,6 +4,7 @@ import asyncio
 import random
 import os
 import ssl
+import re
 from corrections import pokemon_map
 
 # --- CONFIGURATION ---
@@ -21,9 +22,27 @@ OCR_KEYS = [
 
 SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 spam_enabled = True
-captcha_hit = False  # New safety switch
+captcha_hit = False 
+last_ocr_fail_time = 0
+ocr_on_cooldown = False # New safety switch
 
 client = discord.Client(self_bot=True)
+
+# --- HINT SOLVER FUNCTION ---
+def solve_hint(hint_pattern):
+    # Clean pattern: "P_k_c_h_." -> "P_k_c_h_"
+    clean = hint_pattern.replace('\\', '').replace('.', '').replace(' ', '')
+    # Regex: "^P.k.c.h.$"
+    regex_pattern = f"^{clean.replace('_', '.')}$"
+    
+    try:
+        with open("pokemons.txt", "r") as f:
+            names = f.read().splitlines()
+        for name in names:
+            if re.fullmatch(regex_pattern, name, re.IGNORECASE):
+                return name
+    except:
+        return None
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
