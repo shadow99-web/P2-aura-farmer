@@ -140,6 +140,13 @@ async def on_message(message):
             relay_content = content[3:] 
             await message.channel.send(relay_content)
             return
+                    # --- NEW COMMAND: PING (.ping) ---
+        if cmd == ".ping":
+            # Calculate the time it takes for the message to reach you
+            latency = round(client.latency * 1000)
+            await message.channel.send(f"🏓 **Pong!** Latency: `{latency}ms`")
+            return
+            
 
         if cmd == ".check":
             await message.channel.send("💰 **Checking Pokétwo Balance...**")
