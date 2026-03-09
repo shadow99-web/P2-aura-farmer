@@ -24,25 +24,30 @@ SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 spam_enabled = True
 captcha_hit = False 
 last_ocr_fail_time = 0
-ocr_on_cooldown = False # New safety switch
+ocr_on_cooldown = False
+hint_already_sent = False
+# New safety switch
 
 client = discord.Client(self_bot=True)
 
-# --- HINT SOLVER FUNCTION ---
 def solve_hint(hint_pattern):
-    # Clean pattern: "P_k_c_h_." -> "P_k_c_h_"
-    clean = hint_pattern.replace('\\', '').replace('.', '').replace(' ', '')
-    # Regex: "^P.k.c.h.$"
+    # 1. Clean the string: remove periods, backslashes, and extra spaces
+    clean = hint_pattern.replace('\\', '').replace('.', '').replace(' ', '').strip()
+    
+    # 2. Convert underscores to dots for Regex (Ar___ba_ -> Ar...ba.)
     regex_pattern = f"^{clean.replace('_', '.')}$"
     
     try:
         with open("pokemons.txt", "r") as f:
             names = f.read().splitlines()
+        
         for name in names:
+            # We must ignore case and check exact length
             if re.fullmatch(regex_pattern, name, re.IGNORECASE):
                 return name
-    except:
-        return None
+    except Exception as e:
+        print(f"File Error: {e}")
+    return None
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
@@ -216,8 +221,9 @@ async def on_message(message):
 
          # 4. CATCHING LOGIC (OCR Priority)
     if message.author.id == POKENAME_BOT_ID:
-        global last_ocr_fail_time, ocr_on_cooldown
+        global last_ocr_fail_time, ocr_on_cooldown, hint_already_sent
         current_time = asyncio.get_event_loop().time()
+        hint_already_sent = False
         
         # Auto-reset OCR cooldown after 10 minutes (600 seconds)
         if ocr_on_cooldown and (current_time - last_ocr_fail_time > 600):
@@ -250,11 +256,12 @@ async def on_message(message):
                     ocr_on_cooldown = True
                     last_ocr_fail_time = current_time
             
-            # Step B: Request Hint (Only runs if OCR failed or is on cooldown)
-            print("💬 Requesting Hint...")
-            await asyncio.sleep(1.2)
-            await message.channel.send("<@716390085896962058> h")
-
+          if not hint_already_sent:
+                print("💬 Requesting Hint...")
+                await asyncio.sleep(1.2)
+                await message.channel.send("<@716390085896962058> h")
+                hint_already_sent = True 
+              
     # 5. AUTOMATIC HINT SOLVER (The Safety Net)
     if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
         try:
