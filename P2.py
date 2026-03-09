@@ -214,36 +214,65 @@ async def on_message(message):
     if captcha_hit:
         return
 
-    # 4. CATCHING LOGIC
+         # 4. CATCHING LOGIC (OCR Priority)
     if message.author.id == POKENAME_BOT_ID:
-        image_url = None
-        if message.attachments:
-            image_url = message.attachments[0].url
-        elif message.embeds and message.embeds[0].image:
+        global last_ocr_fail_time, ocr_on_cooldown
+        current_time = asyncio.get_event_loop().time()
+        
+        # Auto-reset OCR cooldown after 10 minutes (600 seconds)
+        if ocr_on_cooldown and (current_time - last_ocr_fail_time > 600):
+            ocr_on_cooldown = False
+            print("🕒 10 minutes passed. Retrying OCR Keys...")
+
+        image_url = message.attachments[0].url if message.attachments else None
+        if not image_url and message.embeds:
             image_url = message.embeds[0].image.url
 
         if image_url:
-            print(f"\nSpawn detected! Scanning image...")
-            name = await get_pokemon_name(image_url)
-
-            if name:
-                name_upper = name.upper()
-                # Apply corrections from corrections.py
-                if name_upper in pokemon_map:
-                    print(f"Correcting {name_upper} -> {pokemon_map[name_upper]}")
-                    name = pokemon_map[name_upper]
+            # Step A: Only attempt OCR if we aren't in the 10-minute "penalty box"
+            if not ocr_on_cooldown:
+                print("\nSpawn! Trying all 3 OCR keys...")
+                name = await get_pokemon_name(image_url) # This function loops through all 3 keys
                 
-                delay = random.uniform(2.0, 3.1)
-                print(f"Identified: {name}. Catching in {delay:.2f}s...")
-                await asyncio.sleep(delay)
-                await message.channel.send(f"<@716390085896962058> c {name}")
-                print(f"Caught {name}!")
+                if name:
+                    # OCR SUCCESS:
+                    if name.upper() in pokemon_map:
+                        name = pokemon_map[name.upper()]
+                    
+                    delay = random.uniform(2.1, 3.2)
+                    await asyncio.sleep(delay)
+                    await message.channel.send(f"<@716390085896962058> c {name}")
+                    print(f"✅ Caught via OCR: {name}")
+                    return
+                else:
+                    # OCR FAILURE: All keys failed, trigger 10-minute Hint Fallback
+                    print("❌ All keys failed. Switching to Hint Mode for 10 mins.")
+                    ocr_on_cooldown = True
+                    last_ocr_fail_time = current_time
+            
+            # Step B: Request Hint (Only runs if OCR failed or is on cooldown)
+            print("💬 Requesting Hint...")
+            await asyncio.sleep(1.2)
+            await message.channel.send("<@716390085896962058> h")
+
+    # 5. AUTOMATIC HINT SOLVER (The Safety Net)
+    if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
+        try:
+            raw_hint = message.content.split("is ")[1]
+            solved_name = solve_hint(raw_hint)
+            
+            if solved_name:
+                print(f"✅ Hint Solved: {solved_name}")
+                await asyncio.sleep(random.uniform(2.5, 4.0))
+                await message.channel.send(f"<@716390085896962058> c {solved_name}")
             else:
-                print("Failed to identify after trying all keys.")
+                print(f"❓ Could not solve hint pattern: {raw_hint}")
+        except Exception as e:
+            print(f"Hint Error: {e}")
 
 @client.event
 async def on_ready():
-    print(f"Logged in as {client.user} - Multi-Key OCR & Captcha Protection Active")
+    print(f"Logged in as {client.user} - Multi-Key OCR - HINT - Captcha Protection Active")
     client.loop.create_task(spammer())
 
 client.run(TOKEN)
