@@ -134,6 +134,24 @@ async def on_message(message):
             spam_enabled = True
             await message.channel.send("♻️ **System Overhaul Complete.**")
             return
+                   
+        elif cmd == ".ai":
+            ai_enabled = not ai_enabled
+            status = "ENABLED" if ai_enabled else "DISABLED"
+            await message.channel.send(f"🤖 **AI Vision is now {status}**")
+            return
+
+        elif cmd == ".status":
+            ocr_s = "⏳ Cooldown" if ocr_on_cooldown else "✅ Ready"
+            ai_s = "⏳ Cooldown" if ai_on_cooldown else ("✅ Ready" if ai_enabled else "❌ Disabled")
+            await message.channel.send(
+                f" __**System Status**__\n"
+                f"OCR: `{ocr_s}`\n"
+                f"AI Vision: `{ai_s}`\n"
+                f"Spammer: `{'On' if spam_enabled else 'Off'}`"
+            )
+            return
+            
 
         # --- FIXED: The .check command ---
         elif cmd == ".check":
