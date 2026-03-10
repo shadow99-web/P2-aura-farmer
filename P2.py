@@ -242,7 +242,7 @@ async def on_message(message):
 
          # 4. CATCHING LOGIC (OCR Priority)
     if message.author.id == POKENAME_BOT_ID:
-        global last_ocr_fail_time, ocr_on_cooldown, hint_already_sent
+        global last_ocr_fail_time, ocr_on_cooldown, last_ai_fail_time, ai_on_cooldown, hint_already_sent
         current_time = asyncio.get_event_loop().time()
         hint_already_sent = False
         
