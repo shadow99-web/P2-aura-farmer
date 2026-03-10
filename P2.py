@@ -21,7 +21,7 @@ async def get_ai_identification(image_url):
                 if resp.status == 200:
                     img_data = await resp.read()
                     # Prompt ensures only the name is returned for catching
-                    prompt = "Identify this Pokemon sprite. Return ONLY the name. No other text or punctuation."
+                    prompt = "Identify this Pokemon sprite. Return just ONLY the name. No other text or punctuation."
                     response = ai_model.generate_content([
                         prompt,
                         {'mime_type': 'image/jpeg', 'data': img_data}
