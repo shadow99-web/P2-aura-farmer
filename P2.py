@@ -6,6 +6,32 @@ import os
 import ssl
 import re
 from corrections import pokemon_map
+import google.generativeai as genai
+
+# --- AI CONFIGURATION ---
+# Use the API Key you obtained from Google AI Studio
+GEMINI_API_KEY = "YOUR_API_KEY" 
+genai.configure(api_key=GEMINI_API_KEY)
+ai_model = genai.GenerativeModel('gemini-1.5-flash')
+
+async def get_ai_identification(image_url):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as resp:
+                if resp.status == 200:
+                    img_data = await resp.read()
+                    # Prompt ensures only the name is returned for catching
+                    prompt = "Identify this Pokemon sprite. Return ONLY the name. No other text or punctuation."
+                    response = ai_model.generate_content([
+                        prompt,
+                        {'mime_type': 'image/jpeg', 'data': img_data}
+                    ])
+                    name = response.text.strip().split()[0]
+                    return "".join(c for c in name if c.isalpha())
+    except Exception as e:
+        print(f"AI Vision Error: {e}")
+    return None
+    
 
 # --- CONFIGURATION ---
 TOKEN = "your_acc_token"
