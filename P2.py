@@ -26,6 +26,9 @@ captcha_hit = False
 last_ocr_fail_time = 0
 ocr_on_cooldown = False
 hint_already_sent = False
+ai_on_cooldown = False
+last_ai_fail_time = 0
+ai_enabled = True
 # New safety switch
 
 client = discord.Client(self_bot=True)
