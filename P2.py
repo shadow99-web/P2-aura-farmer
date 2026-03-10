@@ -267,47 +267,60 @@ async def on_message(message):
         return
 
          # 4. CATCHING LOGIC (OCR Priority)
+     # --- TIME & TIMER MANAGEMENT ---
+    current_time = asyncio.get_event_loop().time()
+    if ocr_on_cooldown and (current_time - last_ocr_fail_time > 600):
+        ocr_on_cooldown = False
+        print("🕒 OCR Cooldown Over.")
+    if ai_on_cooldown and (current_time - last_ai_fail_time > 900): # 15 min
+        ai_on_cooldown = False
+        print("🕒 AI Cooldown Over.")
+
+    # --- LAYER 1: OCR (Triggered by Pokename Bot) ---
     if message.author.id == POKENAME_BOT_ID:
-        global last_ocr_fail_time, ocr_on_cooldown, last_ai_fail_time, ai_on_cooldown, hint_already_sent
-        current_time = asyncio.get_event_loop().time()
-        hint_already_sent = False
-        
-        # Auto-reset OCR cooldown after 10 minutes (600 seconds)
-        if ocr_on_cooldown and (current_time - last_ocr_fail_time > 600):
-            ocr_on_cooldown = False
-            print("🕒 10 minutes passed. Retrying OCR Keys...")
-
+        hint_already_sent = False # Reset flag for new spawn
         image_url = message.attachments[0].url if message.attachments else None
-        if not image_url and message.embeds:
-            image_url = message.embeds[0].image.url
+        
+        if image_url and not ocr_on_cooldown:
+            print("\n🔍 Layer 1: OCR Scanning...")
+            name = await get_pokemon_name(image_url)
+            if name:
+                if name.upper() in pokemon_map: name = pokemon_map[name.upper()]
+                await asyncio.sleep(random.uniform(2.1, 3.2))
+                await message.channel.send(f"<@716390085896962058> c {name}")
+                print(f"✅ Caught via OCR: {name}")
+                return
+            else:
+                print("❌ OCR Failed. Entering Cooldown, waiting for Poketwo image for AI...")
+                ocr_on_cooldown = True
+                last_ocr_fail_time = current_time
 
-        if image_url:
-            # Step A: Only attempt OCR if we aren't in the 10-minute "penalty box"
-            if not ocr_on_cooldown:
-                print("\nSpawn! Trying all 3 OCR keys...")
-                name = await get_pokemon_name(image_url) # This function loops through all 3 keys
-                
-                if name:
-                    # OCR SUCCESS:
-                    if name.upper() in pokemon_map:
-                        name = pokemon_map[name.upper()]
-                    
-                    delay = random.uniform(2.1, 3.2)
-                    await asyncio.sleep(delay)
-                    await message.channel.send(f"<@716390085896962058> c {name}")
-                    print(f"✅ Caught via OCR: {name}")
+    # --- LAYER 2: AI VISION (Triggered by Poketwo Bot) ---
+    if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
+        # Only run AI if OCR has already failed (ocr_on_cooldown is True)
+        if ai_enabled and ocr_on_cooldown and not ai_on_cooldown:
+            # Poketwo sends the large image in an embed
+            image_url = message.embeds[0].image.url if message.embeds else None
+            
+            if image_url:
+                print("🧠 Layer 2: AI Vision (Scanning large Poketwo image)...")
+                ai_name = await get_ai_identification(image_url)
+                if ai_name:
+                    if ai_name.upper() in pokemon_map: ai_name = pokemon_map[ai_name.upper()]
+                    await asyncio.sleep(random.uniform(2.2, 4.2)) # Slightly longer for AI
+                    await message.channel.send(f"<@716390085896962058> c {ai_name}")
+                    print(f"✅ Caught via AI: {ai_name}")
                     return
                 else:
-                    # OCR FAILURE: All keys failed, trigger 10-minute Hint Fallback
-                    print("❌ All keys failed. Switching to Hint Mode for 10 mins.")
-                    ocr_on_cooldown = True
-                    last_ocr_fail_time = current_time
-            
-          if not hint_already_sent:
-                print("💬 Requesting Hint...")
-                await asyncio.sleep(1.2)
-                await message.channel.send("<@716390085896962058> h")
-                hint_already_sent = True 
+                    print("❌ AI Failed. Entering 15m Cooldown. Fallback to Hint...")
+                    ai_on_cooldown = True
+                    last_ai_fail_time = current_time
+                    
+                    # LAYER 3: HINT REQUEST (If AI fails)
+                    if not hint_already_sent:
+                        await asyncio.sleep(1.2)
+                        await message.channel.send("<@716390085896962058> h")
+                        hint_already_sent = True
               
     # 5. AUTOMATIC HINT SOLVER (The Safety Net)
     if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
