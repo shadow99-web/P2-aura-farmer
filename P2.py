@@ -216,7 +216,7 @@ async def spammer():
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
                 print(".", end="", flush=True)
-                await asyncio.sleep(random.uniform(2.5, 4.0))
+                await asyncio.sleep(random.uniform(3.5, 4.6))
             except Exception as e:
                 print(f"\nSpam Error: {e}")
                 await asyncio.sleep(10)
@@ -225,6 +225,11 @@ async def spammer():
 
 @client.event
 async def on_message(message):
+
+      # This prevents the bot from responding to its own messages
+    if message.author.id == client.user.id:
+        return
+        
     global spam_enabled, captcha_hit, manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
     global ocr_on_cooldown, last_ocr_fail_time, ai_on_cooldown, last_ai_fail_time, hint_already_sent
 
