@@ -98,17 +98,28 @@ async def update_github_database(wrong, right):
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+    # Using a fresh connector for Render's network
+    connector = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
         for key in OCR_KEYS:
             try:
-                async with session.post(url, data={'apikey': key, 'url': image_url, 'language': 'eng'}) as resp:
+                payload = {'apikey': key, 'url': image_url, 'language': 'eng', 'isOverlayRequired': False}
+                async with session.post(url, data=payload, timeout=6) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        text = data['ParsedResults'][0]['ParsedText']
-                        name = text.strip().split('\n')[0]
-                        return "".join(c for c in name if c.isalpha())
-            except: continue 
+                        if data.get('ParsedResults'):
+                            # Get the text and strip everything except letters
+                            raw_text = data['ParsedResults'][0]['ParsedText']
+                            name = raw_text.strip().split('\n')[0]
+                            clean_name = "".join(c for c in name if c.isalpha())
+                            if clean_name:
+                                print(f"🔍 OCR Success: {clean_name} (Key: {key[:5]}...)")
+                                return clean_name
+            except Exception as e:
+                print(f"⏩ OCR Key {key[:5]} failed/timed out. Trying next...")
+                continue 
     return None
+
 
 async def spammer():
     await client.wait_until_ready()
@@ -173,10 +184,17 @@ async def on_message(message):
 
     if captcha_hit: return
 
-    # --- CATCHING LAYER 1: OCR ---
+ # --- LAYER 1: OCR ---
     if message.author.id == POKENAME_BOT_ID:
-        img = message.attachments[0].url if message.attachments else None
+        # Check attachments OR embeds for the image URL
+        img = None
+        if message.attachments:
+            img = message.attachments[0].url
+        elif message.embeds and message.embeds[0].image:
+            img = message.embeds[0].image.url
+
         if img:
+            print(f"📸 Image detected from Poké-Name. Starting OCR...")
             name = await get_pokemon_name(img)
             if name:
                 if name.upper() in pokemon_map: name = pokemon_map[name.upper()]
