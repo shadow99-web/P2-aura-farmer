@@ -28,7 +28,9 @@ def run():
 def keep_alive():
     t = Thread(target=run)
     t.start()
-    
+
+keep_alive()
+client = discord.Client(self_bot=True)
 
 def is_bot_sleeping():
     global manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
@@ -103,8 +105,6 @@ last_ai_fail_time = 0
 ai_enabled = True
 # New safety switch
 
-keep_alive()
-client = discord.Client(self_bot=True)
 
 def solve_hint(hint_pattern):
     # 1. Clean the string: remove periods, backslashes, and extra spaces
