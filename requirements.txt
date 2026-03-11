@@ -2,3 +2,4 @@ discord.py-self
 aiohttp
 google-generativeai
 requests
+pytz
