@@ -1,5 +1,9 @@
 # corrections.py
 
+# --- DATABASE CONFIG ---
+SLEEP_START_HOUR = 1
+SLEEP_END_HOUR = 7
+
 pokemon_map = {
     "BATTLECYCLIZAR": "BATTLE CYCLIZAR",
     "SOLOSS": "SOLOSIS",
