@@ -182,7 +182,7 @@ async def on_message(message):
         elif cmd == ".status":
             s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
             await message.channel.send(f"📊 Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
-                elif cmd.startswith(".add "):
+        elif cmd.startswith(".add "):
             parts = content.split(" ")
             if len(parts) >= 3:
                 wrong = parts[1].upper()
