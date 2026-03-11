@@ -177,7 +177,34 @@ async def get_pokemon_name(image_url):
                 continue 
     return None
 
+async def update_github_sleep(start, end):
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     
+    try:
+        r = requests.get(url, headers=headers)
+        if r.status_code != 200: return False
+        
+        data = r.json()
+        sha = data['sha']
+        content = base64.b64decode(data['content']).decode('utf-8')
+        
+        # We use Regex to find and replace the existing lines
+        content = re.sub(r'SLEEP_START_HOUR = \d+', f'SLEEP_START_HOUR = {start}', content)
+        content = re.sub(r'SLEEP_END_HOUR = \d+', f'SLEEP_END_HOUR = {end}', content)
+        
+        payload = {
+            "message": f"Updated Sleep Schedule: {start}-{end}",
+            "content": base64.b64encode(content.encode('utf-8')).decode('utf-8'),
+            "sha": sha
+        }
+        
+        put_r = requests.put(url, headers=headers, json=payload)
+        return put_r.status_code == 200
+    except:
+        return False
+        
+
 async def spammer():
     global spam_enabled, captcha_hit
     await client.wait_until_ready()
@@ -232,7 +259,7 @@ async def on_message(message):
             spam_enabled = True
             await message.channel.send("♻️ **System Overhaul Complete.**")
             return
-                    # --- COMMAND: .setsleep [START] [END] ---
+        # --- PERMANENT .setsleep ---
         elif cmd.startswith(".setsleep "):
             try:
                 parts = content.split(" ")
@@ -240,26 +267,29 @@ async def on_message(message):
                     new_start = int(parts[1])
                     new_end = int(parts[2])
                     
-                    # Basic validation (0-23 hours)
                     if 0 <= new_start <= 23 and 0 <= new_end <= 23:
                         global SLEEP_START_HOUR, SLEEP_END_HOUR, manual_awake
+                        
+                        # Update Local Memory
                         SLEEP_START_HOUR = new_start
                         SLEEP_END_HOUR = new_end
-                        manual_awake = False # Reset override when setting new schedule
+                        manual_awake = False
                         
-                        await message.channel.send(
-                            f"⏰ **Schedule Updated!**\n"
-                            f"Sleep Start: `{SLEEP_START_HOUR}:00`\n"
-                            f"Sleep End: `{SLEEP_END_HOUR}:00`\n"
-                            f"Bot will now rest during these hours."
-                        )
+                        msg = await message.channel.send(f"🔄 **Syncing Sleep Schedule ({new_start}-{new_end}) to GitHub...**")
+                        
+                        # Update GitHub Database
+                        success = await update_github_sleep(new_start, new_end)
+                        
+                        if success:
+                            await msg.edit(content=f"⏰ **Permanent Schedule Updated!**\n`{new_start}:00` to `{new_end}:00` IST (Saved to GitHub)")
+                        else:
+                            await msg.edit(content=f"⚠️ **Memory updated, but GitHub Sync failed.** It will reset on restart.")
                     else:
-                        await message.channel.send("Please use 24-hour format (0-23).")
-                else:
-                    await message.channel.send("Format: `.setsleep [START_HOUR] [END_HOUR]` (e.g., `.setsleep 1 7`)")
-            except ValueError:
-                await message.channel.send(" Please enter valid numbers.")
+                        await message.channel.send("❌ Use 24-hour format (0-23).")
+            except Exception as e:
+                await message.channel.send(f"❌ Error: {e}")
             return
+
         # --- SLEEP CONTROLS ---
         elif cmd == ".sleep":
             manual_awake = False
