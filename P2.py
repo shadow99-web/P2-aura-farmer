@@ -432,75 +432,37 @@ async def on_message(message):
         return
 
          # 4. CATCHING LOGIC (OCR Priority)
-     # --- TIME & TIMER MANAGEMENT ---
-    current_time = asyncio.get_event_loop().time()
-    if ocr_on_cooldown and (current_time - last_ocr_fail_time > 600):
-        ocr_on_cooldown = False
-        print("🕒 OCR Cooldown Over.")
-    if ai_on_cooldown and (current_time - last_ai_fail_time > 900): # 15 min
-        ai_on_cooldown = False
-        print("🕒 AI Cooldown Over.")
-
-    # --- LAYER 1: OCR (Triggered by Pokename Bot) ---
+         # --- LAYER 1: OCR ---
     if message.author.id == POKENAME_BOT_ID:
-        hint_already_sent = False # Reset flag for new spawn
         image_url = message.attachments[0].url if message.attachments else None
-        
-        if image_url and not ocr_on_cooldown:
-            print("\n🔍 Layer 1: OCR Scanning...")
+        if image_url:
             name = await get_pokemon_name(image_url)
             if name:
                 if name.upper() in pokemon_map: name = pokemon_map[name.upper()]
                 await asyncio.sleep(random.uniform(2.1, 3.2))
                 await message.channel.send(f"<@716390085896962058> c {name}")
-                print(f"✅ Caught via OCR: {name}")
-                return
+                return # Exit if caught
             else:
-                print("❌ OCR Failed. Entering Cooldown, waiting for Poketwo image for AI...")
-                ocr_on_cooldown = True
-                last_ocr_fail_time = current_time
+                # If OCR fails, we don't return; we let the bot wait for Layer 2
+                print("❌ OCR failed to find name.")
 
-    # --- LAYER 2: AI VISION (Triggered by Poketwo Bot) ---
+    # --- LAYER 2: AI VISION ---
     if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
-        # Only run AI if OCR has already failed (ocr_on_cooldown is True)
-        if ai_enabled and ocr_on_cooldown and not ai_on_cooldown:
-            # Poketwo sends the large image in an embed
+        # Removed the 'ocr_on_cooldown' requirement so AI is always a backup
+        if ai_enabled and not ai_on_cooldown:
             image_url = message.embeds[0].image.url if message.embeds else None
-            
             if image_url:
-                print("🧠 Layer 2: AI Vision (Scanning large Poketwo image)...")
                 ai_name = await get_ai_identification(image_url)
                 if ai_name:
                     if ai_name.upper() in pokemon_map: ai_name = pokemon_map[ai_name.upper()]
-                    await asyncio.sleep(random.uniform(2.2, 4.2)) # Slightly longer for AI
+                    await asyncio.sleep(random.uniform(2.5, 4.5))
                     await message.channel.send(f"<@716390085896962058> c {ai_name}")
-                    print(f"✅ Caught via AI: {ai_name}")
                     return
                 else:
-                    print("❌ AI Failed. Entering 15m Cooldown. Fallback to Hint...")
-                    ai_on_cooldown = True
-                    last_ai_fail_time = current_time
-                    
-                    # LAYER 3: HINT REQUEST (If AI fails)
-                    if not hint_already_sent:
-                        await asyncio.sleep(1.2)
-                        await message.channel.send("<@716390085896962058> h")
-                        hint_already_sent = True
-              
-    # 5. AUTOMATIC HINT SOLVER (The Safety Net)
-    if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
-        try:
-            raw_hint = message.content.split("is ")[1]
-            solved_name = solve_hint(raw_hint)
-            
-            if solved_name:
-                print(f"✅ Hint Solved: {solved_name}")
-                await asyncio.sleep(random.uniform(2.5, 4.0))
-                await message.channel.send(f"<@716390085896962058> c {solved_name}")
-            else:
-                print(f"❓ Could not solve hint pattern: {raw_hint}")
-        except Exception as e:
-            print(f"Hint Error: {e}")
+                    # If AI also fails, request the hint immediately
+                    await asyncio.sleep(1.0)
+                    await message.channel.send("<@716390085896962058> h")
+
 
 @client.event
 async def on_ready():
