@@ -2,6 +2,8 @@ import discord
 import aiohttp
 import asyncio
 import random
+import base64
+import requests
 import os
 import ssl
 import re
@@ -39,6 +41,8 @@ POKENAME_BOT_ID = 874910942490677270
 POKETWO_ID = 716390085896962058
 SPAM_CHANNEL_ID = 1459841583536148601
 MY_USER_ID = 1378954077462986772
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+REPO_NAME = shadow99-web/P2-aura-farmer
 
 OCR_KEYS = [
     "K81439983988957",
@@ -77,6 +81,44 @@ def solve_hint(hint_pattern):
     except Exception as e:
         print(f"File Error: {e}")
     return None
+
+async def update_github_database(wrong, right):
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    try:
+        # 1. Get the current file content and its 'sha' (needed for updates)
+        r = requests.get(url, headers=headers)
+        if r.status_code != 200:
+            return False, f"GitHub Error: {r.status_code}"
+            
+        data = r.json()
+        sha = data['sha']
+        # Decode the existing file content
+        content = base64.b64decode(data['content']).decode('utf-8')
+        
+        # 2. Add the new line
+        new_line = f'\npokemon_map["{wrong.upper()}"] = "{right}"'
+        updated_content = content + new_line
+        
+        # 3. Push the update back to GitHub
+        payload = {
+            "message": f"Added Correction: {wrong} -> {right}",
+            "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
+            "sha": sha
+        }
+        
+        put_r = requests.put(url, headers=headers, json=payload)
+        if put_r.status_code == 200:
+            return True, "Success"
+        else:
+            return False, f"Push failed: {put_r.status_code}"
+            
+    except Exception as e:
+        return False, str(e)
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
@@ -207,14 +249,27 @@ async def on_message(message):
         elif cmd.startswith(".add "):
             try:
                 parts = content.split(" ")
+                if len(parts) < 3:
+                    await message.channel.send("❌ Format: `.add WrongName CorrectName`")
+                    return
+
                 wrong = parts[1].upper()
                 right = " ".join(parts[2:])
+
+                # Update local map for immediate effect
                 pokemon_map[wrong] = right
-                with open("corrections.py", "a") as f:
-                    f.write(f'\npokemon_map["{wrong}"] = "{right}"')
-                await message.channel.send(f"✅ Added: `{wrong}` → `{right}`")
-            except:
-                await message.channel.send("❌ Format: `.add Wrong Right`")
+                
+                # Inform the user and start GitHub sync
+                msg = await message.channel.send(f"🔄 **Syncing `{wrong}` to GitHub...**")
+                
+                success, error_msg = await update_github_database(wrong, right)
+                
+                if success:
+                    await msg.edit(content=f"✅ **Database Updated:** `{wrong}` → `{right}` (Saved to GitHub)")
+                else:
+                    await msg.edit(content=f"⚠️ **Local update ok, but GitHub failed:** `{error_msg}`")
+            except Exception as e:
+                await message.channel.send(f" System Error: {e}")
             return
 
 
