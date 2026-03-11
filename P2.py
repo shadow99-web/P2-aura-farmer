@@ -198,9 +198,13 @@ async def spammer():
 
 @client.event
 async def on_message(message):
-    global spam_enabled, captcha_hit
+    global spam_enabled, captcha_hit, manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
+    global ocr_on_cooldown, last_ocr_fail_time, ai_on_cooldown, last_ai_fail_time, hint_already_sent
 
-    # 1. REMOTE CONTROL & UTILITIES
+    # --- SAFETY GATE: IGNORE SPAWNS IF SLEEPING ---
+    if is_bot_sleeping() and message.author.id != MY_USER_ID:
+        return
+        
     if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
