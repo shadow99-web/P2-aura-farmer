@@ -85,16 +85,41 @@ def solve_hint(hint_pattern):
 
 async def update_github_database(wrong, right):
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
     try:
         r = requests.get(url, headers=headers)
-        if r.status_code != 200: return False
+        if r.status_code != 200:
+            print(f"❌ GitHub GET failed: {r.status_code} - {r.text}")
+            return False
+            
         data = r.json()
-        sha, content = data['sha'], base64.b64decode(data['content']).decode('utf-8')
+        sha = data['sha']
+        content = base64.b64decode(data['content']).decode('utf-8')
+        
+        # Add the new correction
         new_line = f'\npokemon_map["{wrong.upper()}"] = "{right}"'
-        payload = {"message": f"Add: {wrong}->{right}", "content": base64.b64encode((content+new_line).encode('utf-8')).decode('utf-8'), "sha": sha}
-        return requests.put(url, headers=headers, json=payload).status_code == 200, "Success"
-    except: return False, "Error"
+        updated_content = content + new_line
+        
+        payload = {
+            "message": f"Correction: {wrong} -> {right}",
+            "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
+            "sha": sha
+        }
+        
+        put_r = requests.put(url, headers=headers, json=payload)
+        if put_r.status_code in [200, 201]:
+            print(f"✅ GitHub Sync Successful for {wrong}")
+            return True
+        else:
+            print(f"❌ GitHub PUT failed: {put_r.status_code}")
+            return False
+    except Exception as e:
+        print(f"⚠️ GitHub Sync System Error: {e}")
+        return False
+
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
@@ -157,13 +182,23 @@ async def on_message(message):
         elif cmd == ".status":
             s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
             await message.channel.send(f"📊 Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
-        elif cmd.startswith(".add "):
+                elif cmd.startswith(".add "):
             parts = content.split(" ")
             if len(parts) >= 3:
-                wrong, right = parts[1].upper(), " ".join(parts[2:])
+                wrong = parts[1].upper()
+                right = " ".join(parts[2:])
+                
+                # Update local memory immediately
                 pokemon_map[wrong] = right
-                success, _ = await update_github_database(wrong, right)
-                await message.channel.send("✅ Correction Added." if success else "⚠️ Sync Failed.")
+                
+                # Try to sync to GitHub
+                success = await update_github_database(wrong, right)
+                
+                if success:
+                    await message.channel.send(f"✅ **Correction Added:** `{wrong}` → `{right}`")
+                else:
+                    await message.channel.send("⚠️ **Sync Failed.** Check Render Logs for the error.")
+
 
     if message.author.id == POKETWO_ID:
         if "captcha" in message.content.lower() or "verify" in message.content.lower():
