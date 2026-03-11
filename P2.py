@@ -11,6 +11,24 @@ from corrections import pokemon_map, SLEEP_START_HOUR, SLEEP_END_HOUR
 import google.generativeai as genai
 from datetime import datetime
 import pytz # Add 'pytz' to your requirements.txt
+from flask import Flask
+from threading import Thread
+
+# --- KEEP ALIVE SERVER ---
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+  app.run(host='0.0.0.0',port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+    
 
 def is_bot_sleeping():
     global manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
@@ -85,9 +103,8 @@ last_ai_fail_time = 0
 ai_enabled = True
 # New safety switch
 
+keep_alive()
 client = discord.Client(self_bot=True)
-
-
 
 def solve_hint(hint_pattern):
     # 1. Clean the string: remove periods, backslashes, and extra spaces
