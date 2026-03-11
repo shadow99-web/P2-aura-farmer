@@ -30,7 +30,7 @@ def is_bot_sleeping():
 
 # --- AI CONFIGURATION ---
 # Use the API Key you obtained from Google AI Studio
-GEMINI_API_KEY = "YOUR_API_KEY" 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
@@ -54,7 +54,7 @@ async def get_ai_identification(image_url):
     
 
 # --- CONFIGURATION ---
-TOKEN = "your_acc_token"
+TOKEN = os.getenv("TOKEN")
 POKENAME_BOT_ID = 874910942490677270
 POKETWO_ID = 716390085896962058
 SPAM_CHANNEL_ID = 1459841583536148601
