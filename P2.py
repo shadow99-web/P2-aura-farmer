@@ -9,6 +9,24 @@ import ssl
 import re
 from corrections import pokemon_map
 import google.generativeai as genai
+from datetime import datetime
+import pytz # Add 'pytz' to your requirements.txt
+
+def is_bot_sleeping():
+    global manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
+    if manual_awake:
+        return False
+        
+    # Get current time in India (IST)
+    IST = pytz.timezone('Asia/Kolkata')
+    now_ist = datetime.now(IST).hour
+    
+    # Logic for sleep window (handles overnight schedules like 23 to 6)
+    if SLEEP_START_HOUR < SLEEP_END_HOUR:
+        return SLEEP_START_HOUR <= now_ist < SLEEP_END_HOUR
+    else: # Handles cases like Start: 22, End: 6
+        return now_ist >= SLEEP_START_HOUR or now_ist < SLEEP_END_HOUR
+    
 
 # --- AI CONFIGURATION ---
 # Use the API Key you obtained from Google AI Studio
@@ -44,6 +62,11 @@ MY_USER_ID = 1378954077462986772
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "shadow99-web/P2-aura-farmer" 
 FILE_PATH = "corrections.py"
+# --- SLEEP CONFIG ---
+SLEEP_START_HOUR = 1  # Default 1 AM
+SLEEP_END_HOUR = 7    # Default 7 AM
+manual_awake = False
+
 
 OCR_KEYS = [
     "K81439983988957",
@@ -63,6 +86,8 @@ ai_enabled = True
 # New safety switch
 
 client = discord.Client(self_bot=True)
+
+
 
 def solve_hint(hint_pattern):
     # 1. Clean the string: remove periods, backslashes, and extra spaces
@@ -203,6 +228,49 @@ async def on_message(message):
             spam_enabled = True
             await message.channel.send("♻️ **System Overhaul Complete.**")
             return
+                    # --- COMMAND: .setsleep [START] [END] ---
+        elif cmd.startswith(".setsleep "):
+            try:
+                parts = content.split(" ")
+                if len(parts) == 3:
+                    new_start = int(parts[1])
+                    new_end = int(parts[2])
+                    
+                    # Basic validation (0-23 hours)
+                    if 0 <= new_start <= 23 and 0 <= new_end <= 23:
+                        global SLEEP_START_HOUR, SLEEP_END_HOUR, manual_awake
+                        SLEEP_START_HOUR = new_start
+                        SLEEP_END_HOUR = new_end
+                        manual_awake = False # Reset override when setting new schedule
+                        
+                        await message.channel.send(
+                            f"⏰ **Schedule Updated!**\n"
+                            f"Sleep Start: `{SLEEP_START_HOUR}:00`\n"
+                            f"Sleep End: `{SLEEP_END_HOUR}:00`\n"
+                            f"Bot will now rest during these hours."
+                        )
+                    else:
+                        await message.channel.send("Please use 24-hour format (0-23).")
+                else:
+                    await message.channel.send("Format: `.setsleep [START_HOUR] [END_HOUR]` (e.g., `.setsleep 1 7`)")
+            except ValueError:
+                await message.channel.send(" Please enter valid numbers.")
+            return
+        # --- SLEEP CONTROLS ---
+        elif cmd == ".sleep":
+            manual_awake = False
+            await message.channel.send("🌙 **Schedule Active:** Bot will now follow sleep hours.")
+            return
+
+        elif cmd == ".wakeup":
+            manual_awake = True
+            await message.channel.send("☕ **Manual Override:** Bot is now AWAKE and ignoring schedule.")
+            return
+
+        elif cmd == ".reset sleep":
+            manual_awake = False
+            await message.channel.send(" **Sleep Reset:** Manual override cleared. Following schedule.")
+            return
                    
         elif cmd == ".ai":
             ai_enabled = not ai_enabled
@@ -210,18 +278,22 @@ async def on_message(message):
             await message.channel.send(f"🤖 **AI Vision is now {status}**")
             return
 
-        elif cmd == ".status":
+                elif cmd == ".status":
             ocr_s = "⏳ Cooldown" if ocr_on_cooldown else "✅ Ready"
             ai_s = "⏳ Cooldown" if ai_on_cooldown else ("✅ Ready" if ai_enabled else "❌ Disabled")
+            
+            # Show if bot is currently in sleep mode
+            sleep_status = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
+            
             await message.channel.send(
                 f" __**System Status**__\n"
-                f"OCR: `{ocr_s}`\n"
-                f"AI Vision: `{ai_s}`\n"
+                f"Current Mode: `{sleep_status}`\n"
+                f"Schedule: `{SLEEP_START_HOUR}:00` to `{SLEEP_END_HOUR}:00` (IST)\n"
+                f"OCR: `{ocr_s}` | AI: `{ai_s}`\n"
                 f"Spammer: `{'On' if spam_enabled else 'Off'}`"
             )
             return
             
-
         # --- FIXED: The .check command ---
         elif cmd == ".check":
             await message.channel.send("<@716390085896962058> bal")
