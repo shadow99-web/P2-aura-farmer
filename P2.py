@@ -448,7 +448,7 @@ async def on_message(message):
     if captcha_hit:
         return
 
-         # 4. CATCHING LOGIC (OCR Priority)
+   # 4. CATCHING LOGIC (OCR Priority)
          # --- LAYER 1: OCR ---
     if message.author.id == POKENAME_BOT_ID:
         image_url = message.attachments[0].url if message.attachments else None
@@ -480,6 +480,26 @@ async def on_message(message):
                     await asyncio.sleep(1.0)
                     await message.channel.send("<@716390085896962058> h")
 
+    # --- LAYER 3: HINT SOLVER (Safety Net) ---
+    if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
+        try:
+            # Extract the pattern like "P_k_c_u" from the message
+            raw_hint = message.content.split("is ")[1]
+            solved_name = solve_hint(raw_hint)
+            
+            if solved_name:
+                # Check your local corrections map too
+                if solved_name.upper() in pokemon_map: 
+                    solved_name = pokemon_map[solved_name.upper()]
+                
+                print(f"✅ Hint Solved: {solved_name}")
+                await asyncio.sleep(random.uniform(2.5, 3.8))
+                await message.channel.send(f"<@716390085896962058> c {solved_name}")
+            else:
+                print(f"❓ Could not solve hint pattern: {raw_hint}")
+        except Exception as e:
+            print(f"Hint Error: {e}")
+            
 
 @client.event
 async def on_ready():
