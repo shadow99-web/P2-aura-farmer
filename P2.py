@@ -247,8 +247,8 @@ async def on_message(message):
     if message.author.id == client.user.id:
         return
         
-    global spam_enabled, captcha_hit, manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
-    global ocr_on_cooldown, last_ocr_fail_time, ai_on_cooldown, last_ai_fail_time, hint_already_sent
+global spam_enabled, captcha_hit, manual_awake, SLEEP_START_HOUR, SLEEP_END_HOUR
+    global ocr_on_cooldown, last_ocr_fail_time, ai_on_cooldown, last_ai_fail_time, hint_already_sent, ai_enabled
 
     # --- SAFETY GATE: IGNORE SPAWNS IF SLEEPING ---
     if is_bot_sleeping() and message.author.id != MY_USER_ID:
