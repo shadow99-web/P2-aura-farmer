@@ -7,7 +7,7 @@ import requests
 import os
 import ssl
 import re
-from corrections import pokemon_map
+from corrections import pokemon_map, SLEEP_START_HOUR, SLEEP_END_HOUR
 import google.generativeai as genai
 from datetime import datetime
 import pytz # Add 'pytz' to your requirements.txt
