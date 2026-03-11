@@ -312,7 +312,7 @@ async def on_message(message):
             await message.channel.send(f"🤖 **AI Vision is now {status}**")
             return
 
-                elif cmd == ".status":
+         elif cmd == ".status":
             ocr_s = "⏳ Cooldown" if ocr_on_cooldown else "✅ Ready"
             ai_s = "⏳ Cooldown" if ai_on_cooldown else ("✅ Ready" if ai_enabled else "❌ Disabled")
             
