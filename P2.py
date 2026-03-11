@@ -315,12 +315,10 @@ async def on_message(message):
          elif cmd == ".status":
             ocr_s = "⏳ Cooldown" if ocr_on_cooldown else "✅ Ready"
             ai_s = "⏳ Cooldown" if ai_on_cooldown else ("✅ Ready" if ai_enabled else "❌ Disabled")
-            
-            # Show if bot is currently in sleep mode
             sleep_status = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
             
             await message.channel.send(
-                f" __**System Status**__\n"
+                f"📊 __**System Status**__\n"
                 f"Current Mode: `{sleep_status}`\n"
                 f"Schedule: `{SLEEP_START_HOUR}:00` to `{SLEEP_END_HOUR}:00` (IST)\n"
                 f"OCR: `{ocr_s}` | AI: `{ai_s}`\n"
