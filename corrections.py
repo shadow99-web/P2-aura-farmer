@@ -111,5 +111,7 @@ pokemon_map["MACIKARP"] = "KOIKING"
 
 pokemon_map["LIPPER"] = "BEKIPAN"
 pokemon_map["DUCTRIO"] = "DIGDRI"
-pokemon_map["PORYCON"] = "PORYGON"
+pokemon_map["PORYCON"] = "PORYGON2"
 pokemon_map["SUMMERDEERLING"] = "SUMMER DEERLING"
+
+SPAM_LOCK = False
