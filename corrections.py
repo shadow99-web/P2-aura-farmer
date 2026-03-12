@@ -117,3 +117,4 @@ pokemon_map["SUMMERDEERLING"] = "SUMMER DEERLING"
 SPAM_LOCK = False
 
 pokemon_map["CALARIANSLOWBRO"] = "GALARIAN SLOWBRO"
+pokemon_map["SPAM_LOCK"] = "True"
