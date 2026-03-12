@@ -149,10 +149,13 @@ async def get_pokemon_name(image_url):
 async def spammer():
     global spam_enabled, captcha_hit
     await client.wait_until_ready()
-    channel = client.get_channel(SPAM_CHANNEL_ID)
+    
+    # Check if we locked the spammer 'off' before the last restart
+    if os.path.exists("spam_state.txt"):
+        spam_enabled = False
 
+    channel = client.get_channel(SPAM_CHANNEL_ID)
     while not client.is_closed():
-        # This line is the secret—it must check BOTH enabled and NOT captcha
         if spam_enabled and not captcha_hit and channel:
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
@@ -177,12 +180,19 @@ async def on_message(message):
     if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
-        if cmd == ".stop": 
+        
+          if cmd == ".stop": 
             spam_enabled = False
-            await message.channel.send("🚫 Spammer Paused.")
-        elif cmd == ".start": 
+            # Create a tiny file to tell the bot to stay quiet on restart
+            with open("spam_state.txt", "w") as f: f.write("off")
+            await message.channel.send("🚫 **Spammer Paused & Locked.**")
+
+         elif cmd == ".start": 
             spam_enabled = True
-            await message.channel.send("✅ Spammer Resumed.")
+            if os.path.exists("spam_state.txt"): os.remove("spam_state.txt")
+            await message.channel.send("✅ **Spammer Resumed.**")
+
+            
         elif cmd == ".ping": 
             await message.channel.send(f"🏓 Pong! `{round(client.latency * 1000)}ms`")
         
