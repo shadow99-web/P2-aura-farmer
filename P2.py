@@ -200,7 +200,7 @@ async def on_message(message):
         elif cmd == ".ping": 
             await message.channel.send(f"🏓 Pong! `{round(client.latency * 1000)}ms`")
         
-        if cmd == ".check":
+        elif cmd == ".check":
             await message.channel.send("<@716390085896962058> bal")
             return
 
