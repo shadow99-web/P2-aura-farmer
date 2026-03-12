@@ -188,13 +188,11 @@ async def on_message(message):
         
         if cmd == ".stop": 
             spam_enabled = False
-            # This updates the SPAM_LOCK variable on your GitHub
             await update_github_database("SPAM_LOCK", "True")
             await message.channel.send("🚫 **Spammer Stopped & Locked on GitHub.**")
 
         elif cmd == ".start": 
             spam_enabled = True
-            # This unlocks it on GitHub
             await update_github_database("SPAM_LOCK", "False")
             await message.channel.send("✅ **Spammer Resumed & Unlocked.**")
 
