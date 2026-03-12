@@ -150,13 +150,18 @@ async def spammer():
     global spam_enabled, captcha_hit
     await client.wait_until_ready()
     
-    # Check if we locked the spammer 'off' before the last restart
-    if os.path.exists("spam_state.txt"):
+    # Check the lock you just added to corrections.py
+    from corrections import SPAM_LOCK
+    # If it's saved as a string "True" on GitHub
+    if str(SPAM_LOCK) == "True":
         spam_enabled = False
+        print("🔒 Spammer is locked to OFF based on GitHub.")
 
     channel = client.get_channel(SPAM_CHANNEL_ID)
     while not client.is_closed():
         if spam_enabled and not captcha_hit and channel:
+            
+
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
                 # Slightly longer delay to avoid Discord's internal spam filters
@@ -181,16 +186,17 @@ async def on_message(message):
         content = message.content.strip()
         cmd = content.lower()
         
-          if cmd == ".stop": 
+        if cmd == ".stop": 
             spam_enabled = False
-            # Create a tiny file to tell the bot to stay quiet on restart
-            with open("spam_state.txt", "w") as f: f.write("off")
-            await message.channel.send("🚫 **Spammer Paused & Locked.**")
+            # This updates the SPAM_LOCK variable on your GitHub
+            await update_github_database("SPAM_LOCK", "True")
+            await message.channel.send("🚫 **Spammer Stopped & Locked on GitHub.**")
 
-         elif cmd == ".start": 
+        elif cmd == ".start": 
             spam_enabled = True
-            if os.path.exists("spam_state.txt"): os.remove("spam_state.txt")
-            await message.channel.send("✅ **Spammer Resumed.**")
+            # This unlocks it on GitHub
+            await update_github_database("SPAM_LOCK", "False")
+            await message.channel.send("✅ **Spammer Resumed & Unlocked.**")
 
             
         elif cmd == ".ping": 
@@ -215,6 +221,7 @@ async def on_message(message):
                 # Handles '.trade @user'
                 await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
             return
+            
         elif cmd == ".ai":
             ai_enabled = not ai_enabled
             await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
