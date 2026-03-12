@@ -120,6 +120,33 @@ async def update_github_database(wrong, right):
         print(f"⚠️ GitHub Sync System Error: {e}")
         return False
 
+async def set_spam_lock_github(status):
+    """Dedicated function to only update the SPAM_LOCK line on GitHub."""
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        r = requests.get(url, headers=headers)
+        if r.status_code != 200: return False
+        
+        data = r.json()
+        sha = data['sha']
+        content = base64.b64decode(data['content']).decode('utf-8')
+        
+        # This ONLY replaces the SPAM_LOCK line. 
+        # It cannot mess up your pokemon_map because it doesn't use the map logic.
+        updated_content = re.sub(r'SPAM_LOCK = .*', f'SPAM_LOCK = {status}', content)
+        
+        payload = {
+            "message": f"Spam Lock: {status}",
+            "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
+            "sha": sha
+        }
+        
+        put_r = requests.put(url, headers=headers, json=payload)
+        return put_r.status_code in [200, 201]
+    except:
+        return False
+        
 
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
@@ -150,29 +177,24 @@ async def spammer():
     global spam_enabled, captcha_hit
     await client.wait_until_ready()
     
-    # Check the lock you just added to corrections.py
+    # This is the fix: check the file we saved on GitHub
     from corrections import SPAM_LOCK
-    # If it's saved as a string "True" on GitHub
     if str(SPAM_LOCK) == "True":
         spam_enabled = False
-        print("🔒 Spammer is locked to OFF based on GitHub.")
+        print("🔒 Spammer locked to OFF from GitHub config.")
 
     channel = client.get_channel(SPAM_CHANNEL_ID)
     while not client.is_closed():
+        # Added a check for SPAM_LOCK here too
         if spam_enabled and not captcha_hit and channel:
-            
-
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
-                # Slightly longer delay to avoid Discord's internal spam filters
                 await asyncio.sleep(random.uniform(3.8, 5.5))
             except Exception as e:
-                print(f"Spam Error: {e}")
                 await asyncio.sleep(10)
         else:
-            # If stopped, check again every 5 seconds instead of 
-            # ending the function entirely
             await asyncio.sleep(5)
+
 
 @client.event
 async def on_message(message):
@@ -188,12 +210,14 @@ async def on_message(message):
         
         if cmd == ".stop": 
             spam_enabled = False
-            await update_github_database("SPAM_LOCK", "True")
+            # Uses the safe dedicated function
+            await set_spam_lock_github("True")
             await message.channel.send("🚫 **Spammer Stopped & Locked on GitHub.**")
 
         elif cmd == ".start": 
             spam_enabled = True
-            await update_github_database("SPAM_LOCK", "False")
+            # Uses the safe dedicated function
+            await set_spam_lock_github("False")
             await message.channel.send("✅ **Spammer Resumed & Unlocked.**")
 
             
