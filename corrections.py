@@ -110,3 +110,4 @@ pokemon_map["CROACUNK"] = "CROAGUNK"
 pokemon_map["MACIKARP"] = "KOIKING"
 
 pokemon_map["LIPPER"] = "BEKIPAN"
+pokemon_map["DUCTRIO"] = "DIGDRI"
