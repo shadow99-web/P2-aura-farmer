@@ -111,3 +111,4 @@ pokemon_map["MACIKARP"] = "KOIKING"
 
 pokemon_map["LIPPER"] = "BEKIPAN"
 pokemon_map["DUCTRIO"] = "DIGDRI"
+pokemon_map["PORYCON"] = "PORYGON"
