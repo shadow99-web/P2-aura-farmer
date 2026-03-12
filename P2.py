@@ -147,15 +147,24 @@ async def get_pokemon_name(image_url):
 
 
 async def spammer():
+    global spam_enabled, captcha_hit
     await client.wait_until_ready()
     channel = client.get_channel(SPAM_CHANNEL_ID)
+
     while not client.is_closed():
-        if spam_enabled and channel and not captcha_hit:
+        # This line is the secret—it must check BOTH enabled and NOT captcha
+        if spam_enabled and not captcha_hit and channel:
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
-                await asyncio.sleep(random.uniform(3.5, 4.8))
-            except: await asyncio.sleep(10)
-        else: await asyncio.sleep(5)
+                # Slightly longer delay to avoid Discord's internal spam filters
+                await asyncio.sleep(random.uniform(3.8, 5.5))
+            except Exception as e:
+                print(f"Spam Error: {e}")
+                await asyncio.sleep(10)
+        else:
+            # If stopped, check again every 5 seconds instead of 
+            # ending the function entirely
+            await asyncio.sleep(5)
 
 @client.event
 async def on_message(message):
@@ -176,6 +185,26 @@ async def on_message(message):
             await message.channel.send("✅ Spammer Resumed.")
         elif cmd == ".ping": 
             await message.channel.send(f"🏓 Pong! `{round(client.latency * 1000)}ms`")
+        
+        if cmd == ".check":
+            await message.channel.send("<@716390085896962058> bal")
+            return
+
+        elif cmd.startswith(".s "):
+            # This allows you to send commands like '.s info' or '.s p'
+            await message.channel.send(content[3:])
+            return
+
+        elif cmd.startswith(".trade"):
+            if "confirm" in cmd:
+                await message.channel.send("<@716390085896962058> trade confirm")
+            elif "add" in cmd:
+                # Extracts the ID or number after '.trade add '
+                await message.channel.send(f"<@716390085896962058> trade add {content[11:]}")
+            else:
+                # Handles '.trade @user'
+                await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
+            return
         elif cmd == ".ai":
             ai_enabled = not ai_enabled
             await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
