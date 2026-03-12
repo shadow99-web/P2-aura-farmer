@@ -118,3 +118,4 @@ SPAM_LOCK = False
 
 pokemon_map["CALARIANSLOWBRO"] = "GALARIAN SLOWBRO"
 pokemon_map["SPAM_LOCK"] = "True"
+pokemon_map["PAUORICORIO"] = "ORICORIO"
