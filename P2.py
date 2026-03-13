@@ -328,9 +328,11 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
 
-        # Layer 2: AI & Recovery
+        # --- LAYER 2: AI & RECOVERY ---
         if message.author.id == POKETWO_ID:
             low_content = message.content.lower()
+            
+            # Wild Appearance Logic
             if "wild pokémon has appeared" in low_content and ai_enabled:
                 img = message.embeds[0].image.url if message.embeds else None
                 if img:
@@ -341,20 +343,19 @@ def setup_events(alt_client, nickname):
                     else:
                         await message.channel.send("<@716390085896962058> h")
             
-        # --- WRONG GUESS RECOVERY ---
-         if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
-            # If our aggressive guess was wrong, force the 100% accurate Hint Layer
-            print(f"❌ [{nickname}] Guess was wrong. Forcing Hint for accuracy...")
-            await asyncio.sleep(1.0)
-            await message.channel.send("<@716390085896962058> h")
+            # Wrong Guess Recovery (Aligned with 'if wild pokémon')
+            elif "that is the wrong pokémon" in low_content:
+                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint for accuracy...")
+                await asyncio.sleep(1.0)
+                await message.channel.send("<@716390085896962058> h")
 
-        # --- LAYER 3: HINT SOLVER (The 100% Accuracy Guard) ---
-        if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
-            solved = solve_hint(message.content.split("is ")[1])
-            if solved:
-                # Log this so you can use the .add command later for the map
-                print(f"💡 [{nickname}] Hint Solved: {solved}. Use .add to map this!")
-                await catch_action(message, solved)
+            # Hint Solver (Aligned with 'elif that is the wrong')
+            elif "the pokémon is" in low_content:
+                solved = solve_hint(message.content.split("is ")[1])
+                if solved:
+                    print(f"💡 [{nickname}] Hint Solved: {solved}. Use .add to map this!")
+                    await catch_action(message, solved)
+
 
 
 # --- BOOT LOGIC ---
