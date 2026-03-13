@@ -227,9 +227,16 @@ async def spammer_v2(alt_client):
 
 
 
-@client.event
-async def on_message(message):
-    if message.author.id == client.user.id: return
+# --- THE MULTI-CLIENT HANDLER ---
+def setup_events(alt_client, nickname):
+    @alt_client.event
+    async def on_ready():
+        print(f"✅ {nickname} is online as {alt_client.user}")
+        alt_client.loop.create_task(spammer_v2(alt_client))
+
+    @alt_client.event
+    async def on_message(message):
+        if message.author.id == alt_client.user.id: return
     
     global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
