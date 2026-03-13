@@ -16,20 +16,36 @@ from threading import Thread
 import difflib
 
 def get_best_match(text):
-    """The Spell-Checker: Fixes OCR mistakes using pokemons.txt"""
+    """Aggressive Matcher: Always tries to find a name, even with bad OCR."""
     if not text: return None
-    # 1. Surgical Extraction: Take first line, part before colon, remove non-letters
-    raw_text = text.split('\n')[0].split(':')[0].strip()
-    clean_input = "".join(c for c in raw_text if c.isalpha()).lower()
+
+    # 1. Surgical Extraction: First line, before colon
+    raw_line = text.split('\n')[0].split(':')[0].strip().upper()
+    # Clean version for map/fuzzy check (BASCULIN-WHITE -> BASCULINWHITE)
+    clean_ocr = "".join(c for c in raw_line if c.isalnum())
     
+    # 2. Check manual corrections first
+    if clean_ocr in pokemon_map:
+        return pokemon_map[clean_ocr]
+
+    # 3. Fuzzy search with very low cutoff (0.3)
     try:
         with open("pokemons.txt", "r") as f:
             all_names = f.read().splitlines()
-        # Find match with at least 60% similarity
-        matches = difflib.get_close_matches(clean_input, all_names, n=1, cutoff=0.6)
-        return matches[0] if matches else None
+        
+        # We strip spaces/dashes from the TXT list for better comparison
+        compare_list = [n.lower().replace(" ", "").replace("-", "") for n in all_names]
+        matches = difflib.get_close_matches(clean_ocr.lower(), compare_list, n=1, cutoff=0.3)
+        
+        if matches:
+            index = compare_list.index(matches[0])
+            return all_names[index]
     except:
-        return None
+        pass
+    
+    # 4. Hail Mary: If no match, send the raw OCR text to trigger the 'Wrong' logic
+    return raw_line if raw_line else None
+
         
 
 # --- KEEP ALIVE SERVER ---
@@ -325,14 +341,21 @@ def setup_events(alt_client, nickname):
                     else:
                         await message.channel.send("<@716390085896962058> h")
             
-            elif "that is the wrong pokémon" in low_content:
-                await asyncio.sleep(1)
-                await message.channel.send("<@716390085896962058> h")
-            
-            elif "the pokémon is" in low_content:
-                solved = solve_hint(message.content.split("is ")[1])
-                if solved:
-                    await catch_action(message, solved)
+        # --- WRONG GUESS RECOVERY ---
+      elif message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
+            # If our aggressive guess was wrong, force the 100% accurate Hint Layer
+            print(f"❌ [{nickname}] Guess was wrong. Forcing Hint for accuracy...")
+            await asyncio.sleep(1.0)
+            await message.channel.send("<@716390085896962058> h")
+
+        # --- LAYER 3: HINT SOLVER (The 100% Accuracy Guard) ---
+        if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
+            solved = solve_hint(message.content.split("is ")[1])
+            if solved:
+                # Log this so you can use the .add command later for the map
+                print(f"💡 [{nickname}] Hint Solved: {solved}. Use .add to map this!")
+                await catch_action(message, solved)
+
 
 # --- BOOT LOGIC ---
 async def boot():
