@@ -46,7 +46,7 @@ def keep_alive():
     t.start()
 
 keep_alive()
-client = discord.Client(self_bot=True)
+
 
 # --- AI CONFIG ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -204,27 +204,27 @@ async def get_pokemon_name(image_url):
     return None
 
 
-async def spammer():
-    global spam_enabled, captcha_hit
-    await client.wait_until_ready()
+async def spammer_v2(alt_client):
+    """Spammer that respects the specific client it belongs to."""
+    await alt_client.wait_until_ready()
     
-    # This is the fix: check the file we saved on GitHub
     from corrections import SPAM_LOCK
-    if str(SPAM_LOCK) == "True":
-        spam_enabled = False
-        print("🔒 Spammer locked to OFF from GitHub config.")
+    # Staggered start so alts don't all hit the API at once
+    await asyncio.sleep(random.randint(5, 20))
 
-    channel = client.get_channel(SPAM_CHANNEL_ID)
-    while not client.is_closed():
-        # Added a check for SPAM_LOCK here too
-        if spam_enabled and not captcha_hit and channel:
+    # Find the right channel for THIS specific alt
+    channel = alt_client.get_channel(SPAM_CHANNEL_ID) 
+    
+    while not alt_client.is_closed():
+        if spam_enabled and not captcha_hit and str(SPAM_LOCK) != "True":
             try:
                 await channel.send(random.choice(SPAM_MESSAGES))
-                await asyncio.sleep(random.uniform(3.8, 5.5))
-            except Exception as e:
-                await asyncio.sleep(10)
+                # Randomized long delay (12-18s) to avoid IP bans
+                await asyncio.sleep(random.uniform(12.0, 18.0))
+            except: await asyncio.sleep(20)
         else:
             await asyncio.sleep(5)
+
 
 
 @client.event
@@ -366,32 +366,44 @@ async def on_message(message):
         if solved:
             await catch_action(message, solved)
 
+# --- REPLACE your 'client = ...' with this ---
+# We don't create the client here anymore; we create it inside the booter.
+clients = []
+
+# --- REPLACE your 'boot' and 'attempt_login' with this ---
 async def boot():
     keep_alive()
     from config import ACCOUNTS
     
-    # We use a list to keep track of start tasks that don't crash the loop
+    tasks = []
     for acc in ACCOUNTS:
         token = acc.get("token")
-        if not token:
-            print(f"⚠️ Skipping {acc['name']}: No token provided.")
-            continue
-            
-        # We start each client in its own task so one failure doesn't stop the others
-        print(f"📡 Attempting to start {acc['name']}...")
-        asyncio.create_task(attempt_login(token.strip(), acc['name']))
+        if not token: continue
+        
+        # Create a UNIQUE client for every alt
+        alt_client = discord.Client(self_bot=True, intents=discord.Intents.all())
+        
+        # We MUST attach the events (on_message, on_ready) to EACH alt_client
+        # I will show you how to do this easily below
+        setup_events(alt_client, acc['name']) 
+        
+        print(f"📡 Launching {acc['name']}...")
+        tasks.append(alt_client.start(token.strip()))
 
-    # Keep the main loop alive forever
-    while True:
-        await asyncio.sleep(3600)
+    await asyncio.gather(*tasks)
 
-async def attempt_login(token, name):
-    try:
-        await client.start(token)
-    except discord.errors.LoginFailure:
-        print(f"❌ CRITICAL: Token for {name} is INVALID. Skipping this account.")
-    except Exception as e:
-        print(f"⚠️ Error starting {name}: {e}")
+def setup_events(alt_client, nickname):
+    @alt_client.event
+    async def on_ready():
+        print(f"✅ {nickname} is online as {alt_client.user}")
+        alt_client.loop.create_task(spammer_v2(alt_client)) # Unique spammer for each
+
+    @alt_client.event
+    async def on_message(message):
+        # Move your ENTIRE on_message logic here
+        # (Be sure to use 'alt_client' instead of 'client' inside this function)
+        pass
+
         
 
 
@@ -400,4 +412,9 @@ async def on_ready():
     print(f"Logged in as {client.user}")
     client.loop.create_task(spammer())
 
-client.run(TOKEN)
+if __name__ == "__main__":
+    try:
+        asyncio.run(boot())
+    except KeyboardInterrupt:
+        print("Stopping bots...")
+        
