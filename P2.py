@@ -342,7 +342,7 @@ def setup_events(alt_client, nickname):
                         await message.channel.send("<@716390085896962058> h")
             
         # --- WRONG GUESS RECOVERY ---
-      elif message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
+         if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
             # If our aggressive guess was wrong, force the 100% accurate Hint Layer
             print(f"❌ [{nickname}] Guess was wrong. Forcing Hint for accuracy...")
             await asyncio.sleep(1.0)
