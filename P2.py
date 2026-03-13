@@ -235,7 +235,7 @@ def setup_events(alt_client, nickname):
         alt_client.loop.create_task(spammer_v2(alt_client))
 
     @alt_client.event
-    async def on_message(message):
+async def on_message(message):
         # 1. Self-Ignore: Don't let the bots talk to themselves
         if message.author.id == alt_client.user.id: return
     
