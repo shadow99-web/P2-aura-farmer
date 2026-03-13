@@ -330,30 +330,30 @@ def setup_events(alt_client, nickname):
  
         # --- LAYER 0: P2A ASSISTANT (Text Detection) ---
     # Replace 1222165039434436668 with the actual ID of your text bot
-    if message.author.id == 1307910235737948252:
-        matched = get_best_match(message.content) # Extracts name and spell-checks
+     if message.author.id == 1307910235737948252:
+         matched = get_best_match(message.content) # Extracts name and spell-checks
         if matched:
             await catch_action(message, matched)
             return
 
     # --- LAYER 1: OCR (Poké-Name) ---
-    if message.author.id == POKENAME_BOT_ID:
+      if message.author.id == POKENAME_BOT_ID:
         img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds and message.embeds[0].image else None)
-        if img:
+          if img:
             print(f"📸 Poké-Name Spawn. Starting OCR...")
             raw_ocr = await get_pokemon_name(img)
             matched = get_best_match(raw_ocr) # Fixes typos like 'CALARIAN'
-            if matched:
+             if matched:
                 await catch_action(message, matched)
                 return
 
     # --- LAYER 2: AI VISION (Wild Spawn) ---
-    if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
-        if ai_enabled and message.embeds:
+      if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
+         if ai_enabled and message.embeds:
             img = message.embeds[0].image.url
             raw_ai = await get_ai_identification(img)
             matched = get_best_match(raw_ai) # Spell-checks AI result
-            if matched:
+             if matched:
                 await catch_action(message, matched)
             else:
                 # If AI fails, immediately ask for Hint to skip cooldown
@@ -361,7 +361,7 @@ def setup_events(alt_client, nickname):
                 await message.channel.send("<@716390085896962058> h")
 
         # --- WRONG GUESS RECOVERY ---
-    if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
+     if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
         # If we guessed 'CALARIANSLOWBRO' and it was wrong, 
         # we don't wait—we force the Hint layer immediately.
         print("❌ Spell-check match was incorrect. Forcing Hint...")
@@ -370,7 +370,7 @@ def setup_events(alt_client, nickname):
         
 
     # --- LAYER 3: HINT SOLVER ---
-    if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
+     if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
         solved = solve_hint(message.content.split("is ")[1])
         if solved:
             await catch_action(message, solved)
