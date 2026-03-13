@@ -240,40 +240,40 @@ def setup_events(alt_client, nickname):
         if message.author.id == alt_client.user.id: return
     
     
-    global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
+       global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
-    if is_bot_sleeping() and message.author.id != MY_USER_ID: return
+       if is_bot_sleeping() and message.author.id != MY_USER_ID: return
         
-    if message.author.id == MY_USER_ID:
+       if message.author.id == MY_USER_ID:
         content = message.content.strip()
         cmd = content.lower()
         
-        if cmd == ".stop": 
+         if cmd == ".stop": 
             spam_enabled = False
             # Uses the safe dedicated function
             await set_spam_lock_github("True")
             await message.channel.send("🚫 **Spammer Stopped & Locked on GitHub.**")
 
-        elif cmd == ".start": 
+         elif cmd == ".start": 
             spam_enabled = True
             # Uses the safe dedicated function
             await set_spam_lock_github("False")
             await message.channel.send("✅ **Spammer Resumed & Unlocked.**")
 
             
-        elif cmd == ".ping": 
+         elif cmd == ".ping": 
             await message.channel.send(f"🏓 Pong! `{round(client.latency * 1000)}ms`")
         
-        elif cmd == ".check":
+         elif cmd == ".check":
             await message.channel.send("<@716390085896962058> bal")
             return
 
-        elif cmd.startswith(".s "):
+         elif cmd.startswith(".s "):
             # This allows you to send commands like '.s info' or '.s p'
             await message.channel.send(content[3:])
             return
 
-        elif cmd.startswith(".trade"):
+         elif cmd.startswith(".trade"):
             if "confirm" in cmd:
                 await message.channel.send("<@716390085896962058> trade confirm")
             elif "add" in cmd:
@@ -284,13 +284,13 @@ def setup_events(alt_client, nickname):
                 await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
             return
             
-        elif cmd == ".ai":
+         elif cmd == ".ai":
             ai_enabled = not ai_enabled
             await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
-        elif cmd == ".status":
+         elif cmd == ".status":
             s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
             await message.channel.send(f"📊 Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
-        elif cmd.startswith(".add "):
+         elif cmd.startswith(".add "):
             parts = content.split(" ")
             if len(parts) >= 3:
                 wrong = parts[1].upper()
