@@ -227,7 +227,7 @@ async def spammer_v2(alt_client):
 
 
 
-# --- THE MULTI-CLIENT HANDLER ---
+# --- MULTI-CLIENT HANDLER ---
 def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_ready():
@@ -236,7 +236,9 @@ def setup_events(alt_client, nickname):
 
     @alt_client.event
     async def on_message(message):
+        # 1. Self-Ignore: Don't let the bots talk to themselves
         if message.author.id == alt_client.user.id: return
+    
     
     global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
