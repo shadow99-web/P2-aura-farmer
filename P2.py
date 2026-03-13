@@ -13,6 +13,24 @@ from datetime import datetime
 import pytz 
 from flask import Flask
 from threading import Thread
+import difflib
+
+def get_best_match(text):
+    """The Spell-Checker: Fixes OCR mistakes using pokemons.txt"""
+    if not text: return None
+    # 1. Surgical Extraction: Take first line, part before colon, remove non-letters
+    raw_text = text.split('\n')[0].split(':')[0].strip()
+    clean_input = "".join(c for c in raw_text if c.isalpha()).lower()
+    
+    try:
+        with open("pokemons.txt", "r") as f:
+            all_names = f.read().splitlines()
+        # Find match with at least 60% similarity
+        matches = difflib.get_close_matches(clean_input, all_names, n=1, cutoff=0.6)
+        return matches[0] if matches else None
+    except:
+        return None
+        
 
 # --- KEEP ALIVE SERVER ---
 app = Flask('')
@@ -119,6 +137,19 @@ async def update_github_database(wrong, right):
     except Exception as e:
         print(f"⚠️ GitHub Sync System Error: {e}")
         return False
+        
+async def catch_action(message, name):
+    """Universal catching logic for all alts."""
+    if not name: return
+    # Apply manual map corrections (e.g., BATTLECYCLIZAR -> BATTLE CYCLIZAR)
+    if name.upper() in pokemon_map:
+        name = pokemon_map[name.upper()]
+    
+    # Human-like delay (Staggered for alts)
+    await asyncio.sleep(random.uniform(2.8, 4.5))
+    await message.channel.send(f"<@716390085896962058> c {name}")
+    print(f"🎯 Attempted Catch: {name}")
+    
 
 async def set_spam_lock_github(status):
     """Dedicated function to only update the SPAM_LOCK line on GitHub."""
@@ -287,45 +318,82 @@ async def on_message(message):
 
     if captcha_hit: return
 
- # --- LAYER 1: OCR ---
-    if message.author.id == POKENAME_BOT_ID:
-        # Check attachments OR embeds for the image URL
-        img = None
-        if message.attachments:
-            img = message.attachments[0].url
-        elif message.embeds and message.embeds[0].image:
-            img = message.embeds[0].image.url
+ 
+        # --- LAYER 0: P2A ASSISTANT (Text Detection) ---
+    # Replace 1222165039434436668 with the actual ID of your text bot
+    if message.author.id == 1307910235737948252:
+        matched = get_best_match(message.content) # Extracts name and spell-checks
+        if matched:
+            await catch_action(message, matched)
+            return
 
+    # --- LAYER 1: OCR (Poké-Name) ---
+    if message.author.id == POKENAME_BOT_ID:
+        img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds and message.embeds[0].image else None)
         if img:
-            print(f"📸 Image detected from Poké-Name. Starting OCR...")
-            name = await get_pokemon_name(img)
-            if name:
-                if name.upper() in pokemon_map: name = pokemon_map[name.upper()]
-                await asyncio.sleep(random.uniform(2.5, 3.5))
-                await message.channel.send(f"<@716390085896962058> c {name}")
+            print(f"📸 Poké-Name Spawn. Starting OCR...")
+            raw_ocr = await get_pokemon_name(img)
+            matched = get_best_match(raw_ocr) # Fixes typos like 'CALARIAN'
+            if matched:
+                await catch_action(message, matched)
                 return
 
-    # --- CATCHING LAYER 2: AI ---
+    # --- LAYER 2: AI VISION (Wild Spawn) ---
     if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
-        if ai_enabled:
-            img = message.embeds[0].image.url if message.embeds else None
-            if img:
-                name = await get_ai_identification(img)
-                if name:
-                    if name.upper() in pokemon_map: name = pokemon_map[name.upper()]
-                    await asyncio.sleep(random.uniform(3.0, 4.5))
-                    await message.channel.send(f"<@716390085896962058> c {name}")
-                else:
-                    await asyncio.sleep(1.2)
-                    await message.channel.send("<@716390085896962058> h")
+        if ai_enabled and message.embeds:
+            img = message.embeds[0].image.url
+            raw_ai = await get_ai_identification(img)
+            matched = get_best_match(raw_ai) # Spell-checks AI result
+            if matched:
+                await catch_action(message, matched)
+            else:
+                # If AI fails, immediately ask for Hint to skip cooldown
+                await asyncio.sleep(1.0)
+                await message.channel.send("<@716390085896962058> h")
 
-    # --- CATCHING LAYER 3: HINT ---
+        # --- WRONG GUESS RECOVERY ---
+    if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
+        # If we guessed 'CALARIANSLOWBRO' and it was wrong, 
+        # we don't wait—we force the Hint layer immediately.
+        print("❌ Spell-check match was incorrect. Forcing Hint...")
+        await asyncio.sleep(1.0)
+        await message.channel.send("<@716390085896962058> h")
+        
+
+    # --- LAYER 3: HINT SOLVER ---
     if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
         solved = solve_hint(message.content.split("is ")[1])
         if solved:
-            if solved.upper() in pokemon_map: solved = pokemon_map[solved.upper()]
-            await asyncio.sleep(random.uniform(2.5, 3.8))
-            await message.channel.send(f"<@716390085896962058> c {solved}")
+            await catch_action(message, solved)
+
+async def boot():
+    keep_alive()
+    from config import ACCOUNTS
+    
+    # We use a list to keep track of start tasks that don't crash the loop
+    for acc in ACCOUNTS:
+        token = acc.get("token")
+        if not token:
+            print(f"⚠️ Skipping {acc['name']}: No token provided.")
+            continue
+            
+        # We start each client in its own task so one failure doesn't stop the others
+        print(f"📡 Attempting to start {acc['name']}...")
+        asyncio.create_task(attempt_login(token.strip(), acc['name']))
+
+    # Keep the main loop alive forever
+    while True:
+        await asyncio.sleep(3600)
+
+async def attempt_login(token, name):
+    try:
+        await client.start(token)
+    except discord.errors.LoginFailure:
+        print(f"❌ CRITICAL: Token for {name} is INVALID. Skipping this account.")
+    except Exception as e:
+        print(f"⚠️ Error starting {name}: {e}")
+        
+
 
 @client.event
 async def on_ready():
