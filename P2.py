@@ -236,195 +236,119 @@ def setup_events(alt_client, nickname):
 
     @alt_client.event
     async def on_message(message):
-        # 1. Self-Ignore: Don't let the bots talk to themselves
+        # EVERYTHING below must be indented at this level to be "heard"
         if message.author.id == alt_client.user.id: return
-    
-    
-       global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
-
-       if is_bot_sleeping() and message.author.id != MY_USER_ID: return
         
-       if message.author.id == MY_USER_ID:
-        content = message.content.strip()
-        cmd = content.lower()
-        
-         if cmd == ".stop": 
-            spam_enabled = False
-            # Uses the safe dedicated function
-            await set_spam_lock_github("True")
-            await message.channel.send("🚫 **Spammer Stopped & Locked on GitHub.**")
+        global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
-         elif cmd == ".start": 
-            spam_enabled = True
-            # Uses the safe dedicated function
-            await set_spam_lock_github("False")
-            await message.channel.send("✅ **Spammer Resumed & Unlocked.**")
-
+        # 1. Sleep Logic
+        if is_bot_sleeping() and message.author.id != MY_USER_ID: return
             
-         elif cmd == ".ping": 
-            await message.channel.send(f"🏓 Pong! `{round(client.latency * 1000)}ms`")
-        
-         elif cmd == ".check":
-            await message.channel.send("<@716390085896962058> bal")
-            return
-
-         elif cmd.startswith(".s "):
-            # This allows you to send commands like '.s info' or '.s p'
-            await message.channel.send(content[3:])
-            return
-
-         elif cmd.startswith(".trade"):
-            if "confirm" in cmd:
-                await message.channel.send("<@716390085896962058> trade confirm")
-            elif "add" in cmd:
-                # Extracts the ID or number after '.trade add '
-                await message.channel.send(f"<@716390085896962058> trade add {content[11:]}")
-            else:
-                # Handles '.trade @user'
-                await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
-            return
+        # 2. Admin Commands
+        if message.author.id == MY_USER_ID:
+            content = message.content.strip()
+            cmd = content.lower()
             
-         elif cmd == ".ai":
-            ai_enabled = not ai_enabled
-            await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
-         elif cmd == ".status":
-            s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
-            await message.channel.send(f"📊 Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
-         elif cmd.startswith(".add "):
-            parts = content.split(" ")
-            if len(parts) >= 3:
-                wrong = parts[1].upper()
-                right = " ".join(parts[2:])
-                
-                # Update local memory immediately
-                pokemon_map[wrong] = right
-                
-                # Try to sync to GitHub
-                success = await update_github_database(wrong, right)
-                
-                if success:
-                    await message.channel.send(f"✅ **Correction Added:** `{wrong}` → `{right}`")
+            if cmd == ".stop": 
+                spam_enabled = False
+                await set_spam_lock_github("True")
+                await message.channel.send(f"🚫 **{nickname} Spammer Stopped.**")
+            elif cmd == ".start": 
+                spam_enabled = True
+                await set_spam_lock_github("False")
+                await message.channel.send(f"✅ **{nickname} Spammer Resumed.**")
+            elif cmd == ".ping": 
+                await message.channel.send(f"🏓 `{nickname}` Pong! `{round(alt_client.latency * 1000)}ms`")
+            elif cmd == ".check":
+                await message.channel.send("<@716390085896962058> bal")
+            elif cmd.startswith(".s "):
+                await message.channel.send(content[3:])
+            elif cmd.startswith(".trade"):
+                if "confirm" in cmd:
+                    await message.channel.send("<@716390085896962058> trade confirm")
+                elif "add" in cmd:
+                    await message.channel.send(f"<@716390085896962058> trade add {content[11:]}")
                 else:
-                    await message.channel.send("⚠️ **Sync Failed.** Check Render Logs for the error.")
+                    await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
+            elif cmd == ".ai":
+                ai_enabled = not ai_enabled
+                await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
+            elif cmd == ".status":
+                s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
+                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
+            elif cmd.startswith(".add "):
+                parts = content.split(" ")
+                if len(parts) >= 3:
+                    wrong, right = parts[1].upper(), " ".join(parts[2:])
+                    pokemon_map[wrong] = right
+                    success = await update_github_database(wrong, right)
+                    await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
+        # 3. Security Check
+        if message.author.id == POKETWO_ID:
+            if "captcha" in message.content.lower() or "verify" in message.content.lower():
+                captcha_hit, spam_enabled = True, False
+                print(f"🚨 CAPTCHA ON {nickname}")
+                return
 
-    if message.author.id == POKETWO_ID:
-        if "captcha" in message.content.lower() or "verify" in message.content.lower():
-            captcha_hit, spam_enabled = True, False
-            return
+        if captcha_hit: return
 
-        # Aggressive Trade Confirm
-        if "confirm this trade?" in message.content or (message.embeds and "confirm this trade?" in str(message.embeds[0].description)):
-            for _ in range(10):
-                await asyncio.sleep(0.5)
-                msg = await message.channel.fetch_message(message.id)
-                if msg.components:
-                    for row in msg.components:
-                        for btn in row.children:
-                            if "Confirm" in getattr(btn, "label", ""):
-                                await btn.click()
-                                return
-
-    if captcha_hit: return
-
- 
-        # --- LAYER 0: P2A ASSISTANT (Text Detection) ---
-    # Replace 1222165039434436668 with the actual ID of your text bot
-     if message.author.id == 1307910235737948252:
-         matched = get_best_match(message.content) # Extracts name and spell-checks
-        if matched:
-            await catch_action(message, matched)
-            return
-
-    # --- LAYER 1: OCR (Poké-Name) ---
-      if message.author.id == POKENAME_BOT_ID:
-        img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds and message.embeds[0].image else None)
-          if img:
-            print(f"📸 Poké-Name Spawn. Starting OCR...")
-            raw_ocr = await get_pokemon_name(img)
-            matched = get_best_match(raw_ocr) # Fixes typos like 'CALARIAN'
-             if matched:
+        # --- CATCHING LAYERS ---
+        
+        # Layer 0: Assistant (Text Detection)
+        if message.author.id == 1307910235737948252:
+            matched = get_best_match(message.content)
+            if matched:
                 await catch_action(message, matched)
                 return
 
-    # --- LAYER 2: AI VISION (Wild Spawn) ---
-      if message.author.id == POKETWO_ID and "wild pokémon has appeared" in message.content.lower():
-         if ai_enabled and message.embeds:
-            img = message.embeds[0].image.url
-            raw_ai = await get_ai_identification(img)
-            matched = get_best_match(raw_ai) # Spell-checks AI result
-             if matched:
-                await catch_action(message, matched)
-            else:
-                # If AI fails, immediately ask for Hint to skip cooldown
-                await asyncio.sleep(1.0)
+        # Layer 1: OCR (Poké-Name)
+        if message.author.id == POKENAME_BOT_ID:
+            img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds else None)
+            if img:
+                raw_ocr = await get_pokemon_name(img)
+                matched = get_best_match(raw_ocr)
+                if matched:
+                    await catch_action(message, matched)
+                    return
+
+        # Layer 2: AI & Recovery
+        if message.author.id == POKETWO_ID:
+            low_content = message.content.lower()
+            if "wild pokémon has appeared" in low_content and ai_enabled:
+                img = message.embeds[0].image.url if message.embeds else None
+                if img:
+                    raw_ai = await get_ai_identification(img)
+                    matched = get_best_match(raw_ai)
+                    if matched:
+                        await catch_action(message, matched)
+                    else:
+                        await message.channel.send("<@716390085896962058> h")
+            
+            elif "that is the wrong pokémon" in low_content:
+                await asyncio.sleep(1)
                 await message.channel.send("<@716390085896962058> h")
+            
+            elif "the pokémon is" in low_content:
+                solved = solve_hint(message.content.split("is ")[1])
+                if solved:
+                    await catch_action(message, solved)
 
-        # --- WRONG GUESS RECOVERY ---
-     if message.author.id == POKETWO_ID and "that is the wrong pokémon" in message.content.lower():
-        # If we guessed 'CALARIANSLOWBRO' and it was wrong, 
-        # we don't wait—we force the Hint layer immediately.
-        print("❌ Spell-check match was incorrect. Forcing Hint...")
-        await asyncio.sleep(1.0)
-        await message.channel.send("<@716390085896962058> h")
-        
-
-    # --- LAYER 3: HINT SOLVER ---
-     if message.author.id == POKETWO_ID and "the pokémon is" in message.content.lower():
-        solved = solve_hint(message.content.split("is ")[1])
-        if solved:
-            await catch_action(message, solved)
-
-# --- REPLACE your 'client = ...' with this ---
-# We don't create the client here anymore; we create it inside the booter.
-clients = []
-
-# --- REPLACE your 'boot' and 'attempt_login' with this ---
+# --- BOOT LOGIC ---
 async def boot():
     keep_alive()
     from config import ACCOUNTS
-    
     tasks = []
     for acc in ACCOUNTS:
         token = acc.get("token")
-        if not token: continue
-        
-        # Create a UNIQUE client for every alt
-        alt_client = discord.Client(self_bot=True, intents=discord.Intents.all())
-        
-        # We MUST attach the events (on_message, on_ready) to EACH alt_client
-        # I will show you how to do this easily below
-        setup_events(alt_client, acc['name']) 
-        
-        print(f"📡 Launching {acc['name']}...")
-        tasks.append(alt_client.start(token.strip()))
-
-    await asyncio.gather(*tasks)
-
-def setup_events(alt_client, nickname):
-    @alt_client.event
-    async def on_ready():
-        print(f"✅ {nickname} is online as {alt_client.user}")
-        alt_client.loop.create_task(spammer_v2(alt_client)) # Unique spammer for each
-
-    @alt_client.event
-    async def on_message(message):
-        # Move your ENTIRE on_message logic here
-        # (Be sure to use 'alt_client' instead of 'client' inside this function)
-        pass
-
-        
-
-
-alt_client = discord.Client(self_bot=True)
+        if token:
+            alt_client = discord.Client(self_bot=True)
             setup_events(alt_client, acc['name']) 
             tasks.append(alt_client.start(token.strip()))
-
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     try:
         asyncio.run(boot())
     except KeyboardInterrupt:
-        print("Stopping bots...")
-        
+        print("Stopping Aura Farmer...")
