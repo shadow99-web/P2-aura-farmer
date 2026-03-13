@@ -235,7 +235,7 @@ def setup_events(alt_client, nickname):
         alt_client.loop.create_task(spammer_v2(alt_client))
 
     @alt_client.event
-async def on_message(message):
+    async def on_message(message):
         # 1. Self-Ignore: Don't let the bots talk to themselves
         if message.author.id == alt_client.user.id: return
     
@@ -416,10 +416,11 @@ def setup_events(alt_client, nickname):
         
 
 
-@client.event
-async def on_ready():
-    print(f"Logged in as {client.user}")
-    client.loop.create_task(spammer())
+alt_client = discord.Client(self_bot=True)
+            setup_events(alt_client, acc['name']) 
+            tasks.append(alt_client.start(token.strip()))
+
+    await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     try:
