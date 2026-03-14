@@ -334,7 +334,7 @@ def setup_events(alt_client, nickname):
         # --- CATCHING LAYERS ---
         
         # Layer 0: Assistant (Text Detection)
-        if message.author.id == 1307910235737948252:
+        if message.author.id == 854233015475109888:
             matched = get_best_match(message.content)
             if matched:
                 await catch_action(message, matched)
