@@ -252,10 +252,13 @@ def setup_events(alt_client, nickname):
 
     @alt_client.event
     async def on_message(message):
-        # EVERYTHING below must be indented at this level to be "heard"
+        # 1. Initialize individual lock status
+        if not hasattr(alt_client, 'captcha_locked'):
+            alt_client.captcha_locked = False
+            
         if message.author.id == alt_client.user.id: return
         
-        global spam_enabled, captcha_hit, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
+        global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
         # 1. Sleep Logic
         if is_bot_sleeping() and message.author.id != MY_USER_ID: return
@@ -269,6 +272,17 @@ def setup_events(alt_client, nickname):
                 spam_enabled = False
                 await set_spam_lock_github("True")
                 await message.channel.send(f"🚫 **{nickname} Spammer Stopped.**")
+                       
+            elif content == ".resume":
+                alt_client.captcha_locked = False
+                await message.channel.send(f"✅ **{nickname}** is back in action!")
+                return
+            
+            elif content == ".resumeall":
+                alt_client.captcha_locked = False
+                await message.channel.send(f"🌍 Global Unlock: **{nickname}** resumed.")
+                # Note: No return here so all bots process this command
+            
             elif cmd == ".start": 
                 spam_enabled = True
                 await set_spam_lock_github("False")
@@ -300,14 +314,22 @@ def setup_events(alt_client, nickname):
                     success = await update_github_database(wrong, right)
                     await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
-        # 3. Security Check
+        # 4. Individual Captcha Isolation & DM
         if message.author.id == POKETWO_ID:
-            if "captcha" in message.content.lower() or "verify" in message.content.lower():
-                captcha_hit, spam_enabled = True, False
-                print(f"🚨 CAPTCHA ON {nickname}")
+            low_msg = message.content.lower()
+            if "captcha" in low_msg or "verify" in low_msg:
+                alt_client.captcha_locked = True
+                print(f"🚨 CAPTCHA on {nickname}! Account Isolated.")
+                
+                try:
+                    main_user = await alt_client.fetch_user(MY_USER_ID)
+                    await main_user.send(f"⚠️ **CAPTCHA ALERT**\nBot: `{nickname}`\nStatus: **PAUSED**\nSolve it and type `.resume` to continue.")
+                except Exception as e:
+                    print(f"DM Failed: {e}")
                 return
 
-        if captcha_hit: return
+        # 5. The Individual Gatekeeper (Kill-switch)
+        if alt_client.captcha_locked: return
 
         # --- CATCHING LAYERS ---
         
