@@ -333,12 +333,13 @@ def setup_events(alt_client, nickname):
 
         # --- CATCHING LAYERS ---
         
-        # Layer 0: Assistant (Text Detection)
-        if message.author.id == 854233015475109888:
+        # --- LAYER 0: Assistant (Multiple IDs) ---
+        if message.author.id in [854233015475109888, 1459494731775217860]:
             matched = get_best_match(message.content)
             if matched:
                 await catch_action(message, matched)
                 return
+
 
         # Layer 1: OCR (Poké-Name)
         if message.author.id == POKENAME_BOT_ID:
