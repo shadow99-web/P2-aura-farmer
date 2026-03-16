@@ -255,6 +255,8 @@ def setup_events(alt_client, nickname):
         # 1. Initialize individual lock status
         if not hasattr(alt_client, 'captcha_locked'):
             alt_client.captcha_locked = False
+        if not hasattr(alt_client, 'ocr_lock'):
+            alt_client.ocr_lock = False
             
         if message.author.id == alt_client.user.id: return
         
@@ -314,16 +316,21 @@ def setup_events(alt_client, nickname):
                     success = await update_github_database(wrong, right)
                     await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
-        # 4. Individual Captcha Isolation & DM
+        # 4. CAPTCHA DETECTION with Message Link
         if message.author.id == POKETWO_ID:
             low_msg = message.content.lower()
             if "captcha" in low_msg or "verify" in low_msg:
                 alt_client.captcha_locked = True
-                print(f"🚨 CAPTCHA on {nickname}! Account Isolated.")
+                jump_url = message.jump_url
+                print(f"🚨 CAPTCHA on {nickname}! isolated.")
                 
                 try:
                     main_user = await alt_client.fetch_user(MY_USER_ID)
-                    await main_user.send(f"⚠️ **CAPTCHA ALERT**\nBot: `{nickname}`\nStatus: **PAUSED**\nSolve it and type `.resume` to continue.")
+                    await main_user.send(
+                        f"⚠️ **CAPTCHA ALERT**\nBot: `{nickname}`\n"
+                        f"🔗 **Solve here:** {jump_url}\n"
+                        f"Status: **PAUSED**. Type `.resume` to continue."
+                    )
                 except Exception as e:
                     print(f"DM Failed: {e}")
                 return
@@ -333,16 +340,25 @@ def setup_events(alt_client, nickname):
 
         # --- CATCHING LAYERS ---
         
-        # --- LAYER 0: Assistant (Multiple IDs) ---
+        # LAYER 0: Assistant (Credit Saver Logic)
         if message.author.id in [854233015475109888, 1459494731775217860]:
             matched = get_best_match(message.content)
             if matched:
+                # Set a lock so Layer 1 doesn't waste OCR credits
+                alt_client.ocr_lock = True 
                 await catch_action(message, matched)
+                
+                # Release lock after 10 seconds (enough for spawn to clear)
+                await asyncio.sleep(10)
+                alt_client.ocr_lock = False
                 return
 
-
-        # Layer 1: OCR (Poké-Name)
+        # LAYER 1: OCR (Anti-Waste Guard)
         if message.author.id == POKENAME_BOT_ID:
+            if getattr(alt_client, 'ocr_lock', False):
+                print(f"⏩ [{nickname}] Assistant handled it. Skipping OCR.")
+                return
+                
             img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds else None)
             if img:
                 raw_ocr = await get_pokemon_name(img)
@@ -350,7 +366,7 @@ def setup_events(alt_client, nickname):
                 if matched:
                     await catch_action(message, matched)
                     return
-
+                    
         # --- LAYER 2: AI & RECOVERY ---
         if message.author.id == POKETWO_ID:
             low_content = message.content.lower()
