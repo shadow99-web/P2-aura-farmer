@@ -305,9 +305,12 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 ai_enabled = not ai_enabled
                 await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
+            
             elif cmd == ".status":
                 s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
-                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
+                l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
+                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
+
             elif cmd.startswith(".add "):
                 parts = content.split(" ")
                 if len(parts) >= 3:
