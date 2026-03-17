@@ -17,5 +17,10 @@ ACCOUNTS = [
         "token": os.getenv("TOKEN3"), 
         "spam_channel": 1459841583536148601, 
         "name": "Alt Account 2"
+    },
+    {
+        "token": os.getenv("TOKEN4"),
+        "spam_channel": 1459841583536148601,
+        "name": "Alt Account 3"
     }
 ]
