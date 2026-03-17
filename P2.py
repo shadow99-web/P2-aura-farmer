@@ -16,12 +16,28 @@ from threading import Thread
 import difflib
 
 def get_best_match(text):
-    """Aggressive Matcher: Always tries to find a name, even with bad OCR."""
+    """Aggressive Matcher: Strips regional prefixes and complex forms."""
     if not text: return None
 
     # 1. Surgical Extraction: First line, before colon
     raw_line = text.split('\n')[0].split(':')[0].strip().upper()
-    # Clean version for map/fuzzy check (BASCULIN-WHITE -> BASCULINWHITE)
+    
+    # --- NEW: PREFIX STRIPPER ---
+    # Words to ignore if they appear at the start of the name
+    prefixes_to_ignore = [
+        "HISUIAN", "ALOLAN", "GALARIAN", "PALDEAN", "FIGHTING", 
+        "PSYCHIC", "ICE", "ZENITH", "ORIGIN", "THERIAN", "SKY",
+        "STEEL", "FLYING", "DARK", "GHOST", "BUG", "ROCK", "WATER", "FIRE", "GRASS", "FAIRY" # Alcremie prefixes
+    ]
+    
+    words = raw_line.split()
+    if words and words[0] in prefixes_to_ignore:
+        # Example: 'HISUIAN ZORUA' -> 'ZORUA'
+        # Example: 'VANILLA CREAM...' -> 'CREAM...'
+        raw_line = " ".join(words[1:])
+        print(f"✂️ Stripped prefix. New target: {raw_line}")
+
+    # Clean version for map/fuzzy check
     clean_ocr = "".join(c for c in raw_line if c.isalnum())
     
     # 2. Check manual corrections first
@@ -43,8 +59,9 @@ def get_best_match(text):
     except:
         pass
     
-    # 4. Hail Mary: If no match, send the raw OCR text to trigger the 'Wrong' logic
+    # 4. Hail Mary
     return raw_line if raw_line else None
+
 
         
 
