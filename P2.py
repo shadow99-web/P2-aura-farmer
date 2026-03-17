@@ -27,7 +27,13 @@ def get_best_match(text):
     prefixes_to_ignore = [
         "HISUIAN", "ALOLAN", "GALARIAN", "PALDEAN", "FIGHTING", 
         "PSYCHIC", "ICE", "ZENITH", "ORIGIN", "THERIAN", "SKY",
-        "STEEL", "FLYING", "DARK", "GHOST", "BUG", "ROCK", "WATER", "FIRE", "GRASS", "FAIRY" # Alcremie prefixes
+        "STEEL", "FLYING", "DARK", "GHOST", "BUG", "ROCK", "WATER", "FIRE", "GRASS", "FAIRY", "VANILLA CREAM BERRY SWEET",
+    "VANILLA CREAM LOVE SWEET",
+    "VANILLA CREAM STAR SWEET",
+    "VANILLA CREAM CLOVER SWEET",
+    "VANILLA CREAM FLOWER SWEET",
+    "VANILLA CREAM RIBBON SWEET",
+    "CUPCAKE", "DUSK", "MIDNIGHT"# Alcremie prefixes
     ]
     
     words = raw_line.split()
