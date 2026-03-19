@@ -114,7 +114,7 @@ pokemon_map["DUCTRIO"] = "DIGDRI"
 pokemon_map["PORYCON"] = "PORYGON2"
 pokemon_map["SUMMERDEERLING"] = "SUMMER DEERLING"
 
-SPAM_LOCK = True
+SPAM_LOCK = False
 
 pokemon_map["CALARIANSLOWBRO"] = "GALARIAN SLOWBRO"
 pokemon_map["SPAM_LOCK"] = "True"
