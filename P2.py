@@ -384,25 +384,21 @@ def setup_events(alt_client, nickname):
 
         # --- CATCHING LAYERS ---
         
-        # LAYER 0: Assistant (Credit Saver Logic)
+        # LAYER 0: Assistant (Check if Assistant Bots are present)
         if message.author.id in [854233015475109888, 1459494731775217860]:
             matched = get_best_match(message.content)
             if matched:
-                # Set a lock so Layer 1 doesn't waste OCR credits
                 alt_client.ocr_lock = True 
                 await catch_action(message, matched)
-                
-                # Release lock after 10 seconds (enough for spawn to clear)
                 await asyncio.sleep(10)
                 alt_client.ocr_lock = False
                 return
 
-        # LAYER 1: OCR (Anti-Waste Guard)
+        # LAYER 1: OCR (Check if Pokename Bot is present)
         if message.author.id == POKENAME_BOT_ID:
             if getattr(alt_client, 'ocr_lock', False):
                 print(f"⏩ [{nickname}] Assistant handled it. Skipping OCR.")
                 return
-                
             img = message.attachments[0].url if message.attachments else (message.embeds[0].image.url if message.embeds else None)
             if img:
                 raw_ocr = await get_pokemon_name(img)
@@ -411,33 +407,41 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
                     
-        # --- LAYER 2: AI & RECOVERY ---
+        # LAYER 2: AI & RECOVERY (Handles servers with NO help bots)
         if message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-            # Wild Appearance Logic
+            # 1. New Spawn Detection
             if "wild pokémon has appeared" in low_content and ai_enabled:
+                # Check if we already caught it via Layer 0 or 1
+                if getattr(alt_client, 'ocr_lock', False): return
+                
                 img = message.embeds[0].image.url if message.embeds else None
                 if img:
+                    print(f"👁️ [{nickname}] No helper bots detected. Using AI Vision...")
                     raw_ai = await get_ai_identification(img)
                     matched = get_best_match(raw_ai)
+                    
                     if matched:
+                        # AI found a name! Catch it.
                         await catch_action(message, matched)
                     else:
+                        # AI failed or isn't sure? Get the hint for 100% accuracy.
                         await message.channel.send("<@716390085896962058> h")
             
-            # Wrong Guess Recovery (Aligned with 'if wild pokémon')
+            # 2. Wrong Guess Recovery
             elif "that is the wrong pokémon" in low_content:
-                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint for accuracy...")
+                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
                 await asyncio.sleep(1.0)
                 await message.channel.send("<@716390085896962058> h")
 
-            # Hint Solver (Aligned with 'elif that is the wrong')
+            # 3. Hint Solver (The Final Safety Net)
             elif "the pokémon is" in low_content:
                 solved = solve_hint(message.content.split("is ")[1])
                 if solved:
-                    print(f"💡 [{nickname}] Hint Solved: {solved}. Use .add to map this!")
+                    print(f"💡 [{nickname}] Hint Solved: {solved}")
                     await catch_action(message, solved)
+
 
 
 
