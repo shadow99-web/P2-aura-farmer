@@ -445,21 +445,51 @@ def setup_events(alt_client, nickname):
 
 
 
+async def safe_start(client, token, nickname):
+    """Starts an individual bot and handles its specific errors independently."""
+    try:
+        print(f"📡 Attempting to login: {nickname}...")
+        # .strip() removes hidden spaces/newlines that cause 4004 errors
+        await client.start(token.strip())
+    except discord.errors.LoginFailure:
+        print(f"❌ {nickname}: LOGIN FAILED. Token is invalid, expired, or changed.")
+    except discord.errors.ConnectionClosed as e:
+        # Handles Render network flickers
+        print(f"⚠️ {nickname}: Connection closed ({e.code}). Retrying in 15s...")
+        await asyncio.sleep(15)
+        await safe_start(client, token, nickname)
+    except Exception as e:
+        print(f"🛑 {nickname} encountered an error: {e}")
+
 # --- BOOT LOGIC ---
 async def boot():
+    # Start the Flask Keep-Alive server
     keep_alive()
+    
     from config import ACCOUNTS
-    tasks = []
+    
     for acc in ACCOUNTS:
         token = acc.get("token")
         if token:
+            # Create a dedicated client for each account
             alt_client = discord.Client(self_bot=True)
-            setup_events(alt_client, acc['name']) 
-            tasks.append(alt_client.start(token.strip()))
-    await asyncio.gather(*tasks)
+            setup_events(alt_client, acc['name'])
+            
+            # Start each bot as its own independent background task
+            asyncio.create_task(safe_start(alt_client, token, acc['name']))
+            # Small delay between logins to prevent Discord rate-limiting the IP
+            await asyncio.sleep(2)
+    
+    # Keep the main process alive forever
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:
-        asyncio.run(boot())
+        # Use the existing event loop to run our boot sequence
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(boot())
     except KeyboardInterrupt:
         print("Stopping Aura Farmer...")
+    except Exception as e:
+        print(f"Fatal System Error: {e}")
