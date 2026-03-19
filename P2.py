@@ -445,50 +445,50 @@ def setup_events(alt_client, nickname):
 
 
 
+# --- MODERN BOOT LOGIC ---
 async def safe_start(client, token, nickname):
-    """Starts an individual bot and handles its specific errors independently."""
+    """Starts an individual bot and handles errors independently."""
     try:
         print(f"📡 Attempting to login: {nickname}...")
-        # .strip() removes hidden spaces/newlines that cause 4004 errors
         await client.start(token.strip())
     except discord.errors.LoginFailure:
-        print(f"❌ {nickname}: LOGIN FAILED. Token is invalid, expired, or changed.")
-    except discord.errors.ConnectionClosed as e:
-        # Handles Render network flickers
-        print(f"⚠️ {nickname}: Connection closed ({e.code}). Retrying in 15s...")
-        await asyncio.sleep(15)
-        await safe_start(client, token, nickname)
+        print(f"❌ {nickname}: LOGIN FAILED. Token is invalid or changed.")
     except Exception as e:
-        print(f"🛑 {nickname} encountered an error: {e}")
+        print(f"🛑 {nickname} Error: {e}")
 
-# --- BOOT LOGIC ---
-async def boot():
-    # Start the Flask Keep-Alive server
+async def main_boot():
+    # 1. Start the Flask server thread
     keep_alive()
     
-    from config import ACCOUNTS
-    
+    # 2. Import accounts from config
+    try:
+        from config import ACCOUNTS
+    except ImportError:
+        print("❌ Error: config.py or ACCOUNTS list not found!")
+        return
+
+    # 3. Launch each bot as a background task
     for acc in ACCOUNTS:
         token = acc.get("token")
         if token:
-            # Create a dedicated client for each account
+            # self_bot=True is required for user accounts
             alt_client = discord.Client(self_bot=True)
             setup_events(alt_client, acc['name'])
             
-            # Start each bot as its own independent background task
+            # This allows bots to run side-by-side
             asyncio.create_task(safe_start(alt_client, token, acc['name']))
-            # Small delay between logins to prevent Discord rate-limiting the IP
-            await asyncio.sleep(2)
+            await asyncio.sleep(2) # Prevent Discord IP rate limits
     
-    # Keep the main process alive forever
+    print("🚀 All systems initialized. Monitoring for spawns...")
+    
+    # 4. Keep the main function running forever
     while True:
         await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:
-        # Use the existing event loop to run our boot sequence
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(boot())
+        # asyncio.run is the modern way to start the loop in Python 3.10+
+        asyncio.run(main_boot())
     except KeyboardInterrupt:
         print("Stopping Aura Farmer...")
     except Exception as e:
