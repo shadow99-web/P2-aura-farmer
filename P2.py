@@ -8,7 +8,8 @@ import os
 import ssl
 import re
 from corrections import pokemon_map, SLEEP_START_HOUR, SLEEP_END_HOUR
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from datetime import datetime
 import pytz 
 from flask import Flask
@@ -69,28 +70,31 @@ def get_best_match(text):
     return raw_line if raw_line else None
 
 
-        
-
-# --- KEEP ALIVE SERVER ---
+# --- IMPROVED KEEP ALIVE SERVER ---
 app = Flask('')
+
 @app.route('/')
-def home(): return "Aura Farmer is active!"
+def home():
+    return "Aura Farmer is active and healthy!"
 
 def run():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    # Render automatically tells the bot which port to use. 
+    # If it's not set, we use 10000 (safe for Render).
+    port = int(os.environ.get("PORT", 10000))
+    try:
+        app.run(host='0.0.0.0', port=port)
+    except Exception as e:
+        print(f"⚠️ Flask Server suppressed (likely already running): {e}")
 
 def keep_alive():
-    t = Thread(target=run)
+    t = Thread(target=run, daemon=True) # daemon=True ensures it dies when main script dies
     t.start()
 
-keep_alive()
 
-
-# --- AI CONFIG ---
+# --- MODERN AI CONFIG (Using your preferred prompt) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
-ai_model = genai.GenerativeModel('gemini-1.5-flash')
+# Using the new Client structure
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 async def get_ai_identification(image_url):
     try:
@@ -98,12 +102,26 @@ async def get_ai_identification(image_url):
             async with session.get(image_url) as resp:
                 if resp.status == 200:
                     img_data = await resp.read()
+                    
+                    # Your original prompt
                     prompt = "Identify this Pokemon sprite. Return just ONLY the name. No other text or punctuation."
-                    response = ai_model.generate_content([prompt, {'mime_type': 'image/jpeg', 'data': img_data}])
+                    
+                    # Updated syntax for the new google-genai package
+                    response = client.models.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=[
+                            prompt,
+                            types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
+                        ]
+                    )
+                    
+                    # Extract the first word and clean it
                     name = response.text.strip().split()[0]
                     return "".join(c for c in name if c.isalpha())
-    except Exception as e: print(f"AI Vision Error: {e}")
+    except Exception as e: 
+        print(f"AI Vision Error: {e}")
     return None
+
 
 # --- CONFIG & GLOBALS ---
 TOKEN = os.getenv("TOKEN")
