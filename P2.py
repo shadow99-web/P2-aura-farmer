@@ -288,9 +288,11 @@ async def spammer_v2(alt_client):
 def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_ready():
-        print(f"✅ {nickname} is online as {alt_client.user}")
+        # This will show up in your Render logs the moment the bot actually connects
+        print(f"✨ [STREAMS ONLINE] {nickname} is fully connected as {alt_client.user}!")
+        
+        # Start the spammer for this specific account
         alt_client.loop.create_task(spammer_v2(alt_client))
-
     @alt_client.event
     async def on_message(message):
         # 1. Initialize individual lock status
