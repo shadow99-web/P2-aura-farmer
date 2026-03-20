@@ -449,48 +449,42 @@ def setup_events(alt_client, nickname):
 
 # --- MODERN BOOT LOGIC ---
 async def safe_start(client, token, nickname):
-    """Starts an individual bot and handles errors independently."""
+    """Starts an individual bot with a forced heartbeat and timeout."""
     try:
-        print(f"📡 Attempting to login: {nickname}...")
+        print(f"📡 [DEBUG] Sending login request for: {nickname}")
+        # We use .start() instead of .run() to keep it inside our main loop
         await client.start(token.strip())
     except discord.errors.LoginFailure:
-        print(f"❌ {nickname}: LOGIN FAILED. Token is invalid or changed.")
+        print(f"❌ [AUTH] {nickname}: Token is invalid. Get a new one from your browser.")
     except Exception as e:
-        print(f"🛑 {nickname} Error: {e}")
+        print(f"🛑 [ERROR] {nickname}: {e}")
 
 async def main_boot():
-    # 1. Start Flask immediately for Render
-    print("🌐 [1/3] Starting Flask Web Server...")
     keep_alive()
     
-    # 2. Build the ACCOUNTS list directly from Environment Variables
-    print("📂 [2/3] Loading tokens from Environment...")
+    # Manually pull from Env for safety
     ACCOUNTS = []
-    # Loop through 1 to 4 to find TOKEN1, TOKEN2, etc.
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
-        if t:
-            ACCOUNTS.append({"token": t, "name": f"Alt Account {i}"})
-    
-    # Check if we found anything
-    if not ACCOUNTS:
-        print("❌ ERROR: No tokens found! Ensure TOKEN1, TOKEN2, etc. are set in Render.")
-        return
+        if t: ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
 
-    # 3. Launch each bot
-    print(f"🚀 [3/3] Launching {len(ACCOUNTS)} bots...")
     for acc in ACCOUNTS:
-        try:
-            alt_client = discord.Client(self_bot=True)
-            setup_events(alt_client, acc['name'])
-            
-            # Start each bot as an independent task
-            asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
-            await asyncio.sleep(5) # Staggered login to avoid IP flags
-        except Exception as e:
-            print(f"⚠️ Launch failed for {acc['name']}: {e}")
+        # --- THE FIX: ADD HEARTBEAT & CHUNK LOADING ---
+        # This prevents the bot from hanging during the "Attempting to login" phase
+        alt_client = discord.Client(
+            self_bot=True, 
+            heartbeat_timeout=60.0, 
+            guild_ready_timeout=60.0
+        )
+        
+        setup_events(alt_client, acc['name'])
+        asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
+        
+        # INCREASE THIS DELAY: 10 seconds between alts
+        # Discord hates it when 4 accounts login from the same IP at once.
+        print(f"⏳ Waiting 10s before next login to avoid IP flags...")
+        await asyncio.sleep(10) 
     
-    print("✅ Monitoring Discord for spawns...")
     while True:
         await asyncio.sleep(3600)
 
