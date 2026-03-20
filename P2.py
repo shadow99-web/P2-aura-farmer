@@ -448,30 +448,37 @@ async def safe_start(client, token, nickname):
         print(f"🛑 [ERROR] {nickname}: {e}")
 
 async def main_boot():
+    # 1. Start the Flask server
     keep_alive()
     
+    # 2. Build Account List
     ACCOUNTS = []
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
-        if t: ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
+        if t:
+            ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
 
-        for acc in ACCOUNTS:
+    # 3. Corrected Loop (One loop, proper spacing)
+    for acc in ACCOUNTS:
+        print(f"📡 Initializing {acc['name']}...")
+        
         # --- THE FINAL DISGUISE: DISABLE COMPRESSION ---
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            # This is the "Magic" line:
             compress=False 
         )
         
         setup_events(alt_client, acc['name'])
+        
+        # Start login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
         print(f"⏳ Staggering login for 30s to bypass IP flags...")
-        await asyncio.sleep(30) # Increased stagger
+        await asyncio.sleep(30) 
 
-    
+    # 4. Keep alive
     while True:
         await asyncio.sleep(3600)
 
