@@ -448,21 +448,26 @@ async def safe_start(client, token, nickname):
         print(f"🛑 [ERROR] {nickname}: {e}")
 
 async def main_boot():
-    # 1. Start the Flask server
+    # 1. Start the Flask server immediately
     keep_alive()
     
-    # 2. Build Account List
+    # 2. Build the Account List from Environment Variables
+    print("📂 [2/3] Loading tokens from Environment...")
     ACCOUNTS = []
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
         if t:
             ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
+    
+    if not ACCOUNTS:
+        print("❌ ERROR: No TOKEN1-4 found in Render Environment Variables!")
+        return
 
-    # 3. Corrected Loop (One loop, proper spacing)
+    # 3. Launch each bot with the "Chrome Disguise"
+    print(f"🚀 [3/3] Launching {len(ACCOUNTS)} bots...")
     for acc in ACCOUNTS:
         print(f"📡 Initializing {acc['name']}...")
         
-        # --- THE FINAL DISGUISE: DISABLE COMPRESSION ---
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
@@ -472,23 +477,23 @@ async def main_boot():
         
         setup_events(alt_client, acc['name'])
         
-        # Start login task
+        # Start the login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
+        # 30-second stagger is critical to avoid IP bans on Render
         print(f"⏳ Staggering login for 30s to bypass IP flags...")
         await asyncio.sleep(30) 
 
-    # 4. Keep alive
+    # 4. Keep the main function running forever
     while True:
         await asyncio.sleep(3600)
 
-
-
 if __name__ == "__main__":
     try:
-        # asyncio.run is the modern way to start the loop in Python 3.10+
+        
         asyncio.run(main_boot())
     except KeyboardInterrupt:
         print("Stopping Aura Farmer...")
     except Exception as e:
         print(f"Fatal System Error: {e}")
+
