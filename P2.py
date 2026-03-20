@@ -451,45 +451,49 @@ async def main_boot():
     # 1. Start the Flask server immediately
     keep_alive()
     
-    # 2. Build the Account List from Environment Variables
-    print("📂 [2/3] Loading tokens from Environment...")
+    # 2. Build the Account List
     ACCOUNTS = []
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
         if t:
             ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
     
-    if not ACCOUNTS:
-        print("❌ ERROR: No TOKEN1-4 found in Render Environment Variables!")
-        return
+    # --- HARDCODED PROXY CONFIG ---
+    # Using your exact credentials from the screenshot
+    proxy_url = "http://ypydpvmg:bh4tgjece0nq@31.59.20.176:6754/"
+    
+    print("📂 [2/3] Loading tokens and testing Proxy...")
 
-    # 3. Launch each bot with the "Chrome Disguise"
-    print(f"🚀 [3/3] Launching {len(ACCOUNTS)} bots...")
+    # 3. Launch each bot
     for acc in ACCOUNTS:
-        proxy_url = os.getenv("PROXY_URL")
-        print(f"📡 Testing Proxy connection for {acc['name']}...")
-        
-        # Test if the proxy is actually working first
+        # Initial Proxy Test for this account
         try:
-            test_resp = requests.get("http://httpbin.org/ip", proxy={"http": proxy_url, "https": proxy_url}, timeout=10)
-            print(f"✅ Proxy Active! IP: {test_resp.json()['origin']}")
+            # We use the 'proxies' dict format here just for the requests test
+            test_resp = requests.get(
+                "https://ipv4.webshare.io/", 
+                proxies={"http": proxy_url, "https": proxy_url}, 
+                timeout=10
+            )
+            print(f"✅ Proxy Test Success for {acc['name']}! IP: {test_resp.text.strip()}")
         except Exception as e:
-            print(f"⚠️ Proxy Test Failed (using direct connection instead): {e}")
-            proxy_url = None
+            print(f"⚠️ Proxy Test Failed for {acc['name']}: {e}")
 
+        # Initialize the Discord Client with the Proxy String
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             compress=False,
-            proxy=proxy_url 
+            proxy=proxy_url  # Discord library takes the string format
         )
         
         setup_events(alt_client, acc['name'])
+        
+        # Start the login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        print(f"⏳ Staggering next login (30s)...")
-        await asyncio.sleep(30)
+        print(f"⏳ Staggering next login (60s) for safety...")
+        await asyncio.sleep(60)
  
 
     # 4. Keep the main function running forever
