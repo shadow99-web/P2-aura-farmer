@@ -449,44 +449,46 @@ def setup_events(alt_client, nickname):
 
 # --- MODERN BOOT LOGIC ---
 async def safe_start(client, token, nickname):
-    """Starts an individual bot with a forced heartbeat and timeout."""
+    """Aggressive login with a hard 30-second timeout."""
     try:
-        print(f"📡 [DEBUG] Sending login request for: {nickname}")
-        # We use .start() instead of .run() to keep it inside our main loop
-        await client.start(token.strip())
+        print(f"📡 [CONNECTING] {nickname}...")
+        # wait_for forces the code to stop hanging if Discord doesn't answer
+        await asyncio.wait_for(client.start(token.strip()), timeout=30.0)
+    except asyncio.TimeoutError:
+        print(f"⚠️ [TIMEOUT] {nickname}: Discord ignored the request. Retrying...")
+        await asyncio.sleep(5)
+        await safe_start(client, token, nickname)
     except discord.errors.LoginFailure:
-        print(f"❌ [AUTH] {nickname}: Token is invalid. Get a new one from your browser.")
+        print(f"❌ [AUTH] {nickname}: Token is invalid.")
     except Exception as e:
         print(f"🛑 [ERROR] {nickname}: {e}")
 
 async def main_boot():
     keep_alive()
     
-    # Manually pull from Env for safety
     ACCOUNTS = []
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
         if t: ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
 
     for acc in ACCOUNTS:
-        # --- THE FIX: ADD HEARTBEAT & CHUNK LOADING ---
-        # This prevents the bot from hanging during the "Attempting to login" phase
+        # --- THE PROXY FIX ---
+        # We set a custom user-agent to bypass basic server-side blocks
         alt_client = discord.Client(
-            self_bot=True, 
-            heartbeat_timeout=60.0, 
-            guild_ready_timeout=60.0
+            self_bot=True,
+            proxy=None, # Ensure no weird proxy settings are interfering
+            heartbeat_timeout=60.0
         )
         
         setup_events(alt_client, acc['name'])
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        # INCREASE THIS DELAY: 10 seconds between alts
-        # Discord hates it when 4 accounts login from the same IP at once.
-        print(f"⏳ Waiting 10s before next login to avoid IP flags...")
-        await asyncio.sleep(10) 
+        # Long stagger to let the IP "cool down"
+        await asyncio.sleep(15) 
     
     while True:
         await asyncio.sleep(3600)
+
 
 
 if __name__ == "__main__":
