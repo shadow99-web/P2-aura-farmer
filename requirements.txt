@@ -3,4 +3,5 @@ aiohttp
 google-genai
 requests
 pytz
+audioop-lpm
 flask
