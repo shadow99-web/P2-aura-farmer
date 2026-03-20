@@ -17,13 +17,6 @@ from threading import Thread
 import difflib
 
 def get_best_match(text):
-    """Aggressive Matcher: Strips regional prefixes and complex forms."""
-    if not text: return None
-
-    # 1. Surgical Extraction: First line, before colon
-    raw_line = text.split('\n')[0].split(':')[0].strip().upper()
-
-def get_best_match(text):
     """Strips regional and flavor prefixes word-by-word for 100% accuracy."""
     if not text: return None
     raw_line = text.split('\n')[0].split(':')[0].strip().upper()
@@ -462,22 +455,21 @@ async def main_boot():
         t = os.getenv(f"TOKEN{i}")
         if t: ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
 
-    for acc in ACCOUNTS:
-        # --- THE DISGUISE ---
+        for acc in ACCOUNTS:
+        # --- THE FINAL DISGUISE: DISABLE COMPRESSION ---
         alt_client = discord.Client(
             self_bot=True,
-            # This forces the bot to mimic a real Windows Chrome browser
             browser="chrome",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            # This is the "Magic" line:
+            compress=False 
         )
         
         setup_events(alt_client, acc['name'])
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        # Give it a HUGE 20-second gap. 
-        # Fast logins from the same IP are what trigger the "Silent Block."
-        print(f"⏳ Staggering login for 20s...")
-        await asyncio.sleep(20) 
+        print(f"⏳ Staggering login for 30s to bypass IP flags...")
+        await asyncio.sleep(30) # Increased stagger
 
     
     while True:
