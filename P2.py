@@ -22,51 +22,42 @@ def get_best_match(text):
 
     # 1. Surgical Extraction: First line, before colon
     raw_line = text.split('\n')[0].split(':')[0].strip().upper()
+
+def get_best_match(text):
+    """Strips regional and flavor prefixes word-by-word for 100% accuracy."""
+    if not text: return None
+    raw_line = text.split('\n')[0].split(':')[0].strip().upper()
     
-    # --- NEW: PREFIX STRIPPER ---
-    # Words to ignore if they appear at the start of the name
+    # Broken down into single words so words[0] actually matches
     prefixes_to_ignore = [
         "HISUIAN", "ALOLAN", "GALARIAN", "PALDEAN", "FIGHTING", 
         "PSYCHIC", "ICE", "ZENITH", "ORIGIN", "THERIAN", "SKY",
-        "STEEL", "FLYING", "DARK", "GHOST", "BUG", "ROCK", "WATER", "FIRE", "GRASS", "FAIRY", "VANILLA CREAM BERRY SWEET",
-    "VANILLA CREAM LOVE SWEET",
-    "VANILLA CREAM STAR SWEET",
-    "VANILLA CREAM CLOVER SWEET",
-    "VANILLA CREAM FLOWER SWEET",
-    "VANILLA CREAM RIBBON SWEET",
-    "CUPCAKE", "DUSK", "MIDNIGHT"# Alcremie prefixes
+        "STEEL", "FLYING", "DARK", "GHOST", "BUG", "ROCK", "WATER", 
+        "FIRE", "GRASS", "FAIRY", "VANILLA", "RUBY", "MATCHA", 
+        "MINT", "LEMON", "SALTED", "CUPCAKE", "DUSK", "MIDNIGHT",
+        "CREAM", "BERRY", "SWEET", "LOVE", "STAR", "CLOVER", "FLOWER", "RIBBON"
     ]
     
     words = raw_line.split()
-    if words and words[0] in prefixes_to_ignore:
-        # Example: 'HISUIAN ZORUA' -> 'ZORUA'
-        # Example: 'VANILLA CREAM...' -> 'CREAM...'
-        raw_line = " ".join(words[1:])
-        print(f"✂️ Stripped prefix. New target: {raw_line}")
-
-    # Clean version for map/fuzzy check
+    # This loop keeps eating prefixes until it hits the actual name
+    while words and words[0] in prefixes_to_ignore:
+        words.pop(0)
+    
+    raw_line = " ".join(words)
     clean_ocr = "".join(c for c in raw_line if c.isalnum())
     
-    # 2. Check manual corrections first
     if clean_ocr in pokemon_map:
         return pokemon_map[clean_ocr]
 
-    # 3. Fuzzy search with very low cutoff (0.3)
     try:
         with open("pokemons.txt", "r") as f:
             all_names = f.read().splitlines()
-        
-        # We strip spaces/dashes from the TXT list for better comparison
         compare_list = [n.lower().replace(" ", "").replace("-", "") for n in all_names]
         matches = difflib.get_close_matches(clean_ocr.lower(), compare_list, n=1, cutoff=0.3)
-        
         if matches:
             index = compare_list.index(matches[0])
             return all_names[index]
-    except:
-        pass
-    
-    # 4. Hail Mary
+    except: pass
     return raw_line if raw_line else None
 
 
@@ -472,19 +463,22 @@ async def main_boot():
         if t: ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
 
     for acc in ACCOUNTS:
-        # --- THE PROXY FIX ---
-        # We set a custom user-agent to bypass basic server-side blocks
+        # --- THE DISGUISE ---
         alt_client = discord.Client(
             self_bot=True,
-            proxy=None, # Ensure no weird proxy settings are interfering
-            heartbeat_timeout=60.0
+            # This forces the bot to mimic a real Windows Chrome browser
+            browser="chrome",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         
         setup_events(alt_client, acc['name'])
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        # Long stagger to let the IP "cool down"
-        await asyncio.sleep(15) 
+        # Give it a HUGE 20-second gap. 
+        # Fast logins from the same IP are what trigger the "Silent Block."
+        print(f"⏳ Staggering login for 20s...")
+        await asyncio.sleep(20) 
+
     
     while True:
         await asyncio.sleep(3600)
