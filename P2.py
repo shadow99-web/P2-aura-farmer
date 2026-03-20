@@ -457,33 +457,41 @@ async def safe_start(client, token, nickname):
         print(f"🛑 {nickname} Error: {e}")
 
 async def main_boot():
-    # 1. Start the Flask server thread
+    # 1. Start Flask immediately for Render
+    print("🌐 [1/3] Starting Flask Web Server...")
     keep_alive()
     
-    # 2. Import accounts from config
-    try:
-        from config import ACCOUNTS
-    except ImportError:
-        print("❌ Error: config.py or ACCOUNTS list not found!")
+    # 2. Build the ACCOUNTS list directly from Environment Variables
+    print("📂 [2/3] Loading tokens from Environment...")
+    ACCOUNTS = []
+    # Loop through 1 to 4 to find TOKEN1, TOKEN2, etc.
+    for i in range(1, 5):
+        t = os.getenv(f"TOKEN{i}")
+        if t:
+            ACCOUNTS.append({"token": t, "name": f"Alt Account {i}"})
+    
+    # Check if we found anything
+    if not ACCOUNTS:
+        print("❌ ERROR: No tokens found! Ensure TOKEN1, TOKEN2, etc. are set in Render.")
         return
 
-    # 3. Launch each bot as a background task
+    # 3. Launch each bot
+    print(f"🚀 [3/3] Launching {len(ACCOUNTS)} bots...")
     for acc in ACCOUNTS:
-        token = acc.get("token")
-        if token:
-            # self_bot=True is required for user accounts
+        try:
             alt_client = discord.Client(self_bot=True)
             setup_events(alt_client, acc['name'])
             
-            # This allows bots to run side-by-side
-            asyncio.create_task(safe_start(alt_client, token, acc['name']))
-            await asyncio.sleep(2) # Prevent Discord IP rate limits
+            # Start each bot as an independent task
+            asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
+            await asyncio.sleep(5) # Staggered login to avoid IP flags
+        except Exception as e:
+            print(f"⚠️ Launch failed for {acc['name']}: {e}")
     
-    print("🚀 All systems initialized. Monitoring for spawns...")
-    
-    # 4. Keep the main function running forever
+    print("✅ Monitoring Discord for spawns...")
     while True:
         await asyncio.sleep(3600)
+
 
 if __name__ == "__main__":
     try:
