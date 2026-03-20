@@ -466,25 +466,31 @@ async def main_boot():
     # 3. Launch each bot with the "Chrome Disguise"
     print(f"🚀 [3/3] Launching {len(ACCOUNTS)} bots...")
     for acc in ACCOUNTS:
-        print(f"📡 Initializing {acc['name']}...")
+        proxy_url = os.getenv("PROXY_URL")
+        print(f"📡 Testing Proxy connection for {acc['name']}...")
         
+        # Test if the proxy is actually working first
+        try:
+            test_resp = requests.get("http://httpbin.org/ip", proxy={"http": proxy_url, "https": proxy_url}, timeout=10)
+            print(f"✅ Proxy Active! IP: {test_resp.json()['origin']}")
+        except Exception as e:
+            print(f"⚠️ Proxy Test Failed (using direct connection instead): {e}")
+            proxy_url = None
+
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             compress=False,
-            
-            proxy=os.getenv("PROXY_URL") 
+            proxy=proxy_url 
         )
         
         setup_events(alt_client, acc['name'])
-        
-        # Start the login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        # 30-second stagger is critical to avoid IP bans on Render
-        print(f"⏳ Staggering login for 30s to bypass IP flags...")
-        await asyncio.sleep(30) 
+        print(f"⏳ Staggering next login (30s)...")
+        await asyncio.sleep(30)
+ 
 
     # 4. Keep the main function running forever
     while True:
