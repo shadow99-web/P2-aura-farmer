@@ -15,6 +15,7 @@ import pytz
 from flask import Flask
 from threading import Thread
 import difflib
+import sys 
 
 def get_best_match(text):
     """Strips regional and flavor prefixes word-by-word for 100% accuracy."""
@@ -447,24 +448,28 @@ async def safe_start(client, token, nickname):
     except Exception as e:
         print(f"🛑 [ERROR] {nickname}: {e}")
 
+
+
 async def main_boot():
-    # 1. Start the Flask server immediately
-    keep_alive()
+    # FORCE LOGS TO FLUSH
+    print("🚀 SYSTEM BOOT SEQUENCE INITIATED...", flush=True)
     
-    # 2. Build the Account List
+    # 1. Start the Flask server
+    keep_alive()
+    print("🌐 Keep-Alive Server Started.", flush=True)
+    
+    # 2. Build Account List
     ACCOUNTS = []
     for i in range(1, 5):
         t = os.getenv(f"TOKEN{i}")
         if t:
             ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
     
-    print("📂 [2/3] Loading tokens... (Direct Connection Mode)")
+    print(f"📂 Found {len(ACCOUNTS)} accounts. Starting login loop...", flush=True)
 
-    # 3. Launch each bot
     for acc in ACCOUNTS:
-        print(f"📡 Initializing {acc['name']} via Direct Render IP...")
+        print(f"📡 [HANDSHAKE] Initializing {acc['name']}...", flush=True)
 
-        # Initialize the Discord Client WITHOUT the proxy line
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
@@ -477,13 +482,12 @@ async def main_boot():
         # Start the login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        # Keep the stagger! It prevents Discord from seeing 4 logins at the exact same second.
-        print(f"⏳ Staggering next login (45s) for safety...")
+        print(f"⏳ Waiting 45s stagger for {acc['name']}...", flush=True)
         await asyncio.sleep(45) 
 
-    # 4. Keep alive
     while True:
         await asyncio.sleep(3600)
+
 
 
 if __name__ == "__main__":
