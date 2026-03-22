@@ -451,39 +451,48 @@ async def safe_start(client, token, nickname):
 
 
 async def main_boot():
-    # FORCE LOGS TO FLUSH
+    keep_alive()
     print("🚀 SYSTEM BOOT SEQUENCE INITIATED...", flush=True)
     
-    # 1. Start the Flask server
-    keep_alive()
-    print("🌐 Keep-Alive Server Started.", flush=True)
-    
-    # 2. Build Account List
     ACCOUNTS = []
+    # Loop through 1-4 to find tokens
     for i in range(1, 5):
-        t = os.getenv(f"TOKEN{i}")
-        if t:
-            ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
+        raw_token = os.getenv(f"TOKEN{i}")
+        if raw_token and len(raw_token.strip()) > 10: # Ensure it's not empty/short
+            ACCOUNTS.append({
+                "token": raw_token.strip(), 
+                "name": f"Alt {i}"
+            })
     
-    print(f"📂 Found {len(ACCOUNTS)} accounts. Starting login loop...", flush=True)
+    if not ACCOUNTS:
+        print("❌ CRITICAL: No valid tokens found in Environment Variables!", flush=True)
+        return
+
+    print(f"📂 Found {len(ACCOUNTS)} valid accounts. Starting login loop...", flush=True)
 
     for acc in ACCOUNTS:
         print(f"📡 [HANDSHAKE] Initializing {acc['name']}...", flush=True)
 
-        alt_client = discord.Client(
-            self_bot=True,
-            browser="chrome",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            compress=False
-        )
-        
-        setup_events(alt_client, acc['name'])
-        
-        # Start the login task
-        asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
-        
-        print(f"⏳ Waiting 45s stagger for {acc['name']}...", flush=True)
-        await asyncio.sleep(45) 
+        try:
+            # Explicitly define the token here to ensure it's a string
+            current_token = str(acc['token'])
+            
+            alt_client = discord.Client(
+                self_bot=True,
+                browser="chrome",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                compress=False
+            )
+            
+            setup_events(alt_client, acc['name'])
+            
+            # Use the cleaned token directly
+            asyncio.create_task(alt_client.start(current_token))
+            
+            print(f"⏳ Waiting 45s stagger for {acc['name']}...", flush=True)
+            await asyncio.sleep(45) 
+        except Exception as e:
+            print(f"🛑 Initialization Error for {acc['name']}: {e}", flush=True)
 
     while True:
         await asyncio.sleep(3600)
