@@ -17,6 +17,23 @@ from threading import Thread
 import difflib
 import sys 
 
+# --- CRITICAL FIX FOR 'NoneType' object is not iterable ---
+from discord.state import ConnectionState
+
+def patched_parse_ready_supplemental(self, data):
+    # This replaces the broken line in the library with a safe version
+    try:
+        self.pending_payments = {
+            int(p['id']): p for p in data.get('pending_payments') or []
+        }
+    except Exception:
+        self.pending_payments = {}
+
+# Apply the patch
+ConnectionState.parse_ready_supplemental = patched_parse_ready_supplemental
+# ---------------------------------------------------------
+
+
 def get_best_match(text):
     """Strips regional and flavor prefixes word-by-word for 100% accuracy."""
     if not text: return None
