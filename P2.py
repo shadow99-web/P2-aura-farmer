@@ -458,33 +458,18 @@ async def main_boot():
         if t:
             ACCOUNTS.append({"token": t, "name": f"Alt {i}"})
     
-    # --- HARDCODED PROXY CONFIG ---
-    # Using your exact credentials from the screenshot
-    proxy_url = "http://ypydpvmg:bh4tgjece0nq@31.59.20.176:6754/"
-    
-    print("📂 [2/3] Loading tokens and testing Proxy...")
+    print("📂 [2/3] Loading tokens... (Direct Connection Mode)")
 
     # 3. Launch each bot
     for acc in ACCOUNTS:
-        # Initial Proxy Test for this account
-        try:
-            # We use the 'proxies' dict format here just for the requests test
-            test_resp = requests.get(
-                "https://ipv4.webshare.io/", 
-                proxies={"http": proxy_url, "https": proxy_url}, 
-                timeout=10
-            )
-            print(f"✅ Proxy Test Success for {acc['name']}! IP: {test_resp.text.strip()}")
-        except Exception as e:
-            print(f"⚠️ Proxy Test Failed for {acc['name']}: {e}")
+        print(f"📡 Initializing {acc['name']} via Direct Render IP...")
 
-        # Initialize the Discord Client with the Proxy String
+        # Initialize the Discord Client WITHOUT the proxy line
         alt_client = discord.Client(
             self_bot=True,
             browser="chrome",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            compress=False,
-            proxy=proxy_url  # Discord library takes the string format
+            compress=False
         )
         
         setup_events(alt_client, acc['name'])
@@ -492,13 +477,14 @@ async def main_boot():
         # Start the login task
         asyncio.create_task(safe_start(alt_client, acc['token'], acc['name']))
         
-        print(f"⏳ Staggering next login (60s) for safety...")
-        await asyncio.sleep(60)
- 
+        # Keep the stagger! It prevents Discord from seeing 4 logins at the exact same second.
+        print(f"⏳ Staggering next login (45s) for safety...")
+        await asyncio.sleep(45) 
 
-    # 4. Keep the main function running forever
+    # 4. Keep alive
     while True:
         await asyncio.sleep(3600)
+
 
 if __name__ == "__main__":
     try:
