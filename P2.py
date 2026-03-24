@@ -113,13 +113,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Using the new Client structure
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+
 async def get_ai_identification(image_url):
-    """
-    ULTIMATE SEQUENTIAL SNIPER (V2):
-    1. Focus on center (ignore background).
-    2. Bruteforce pHash database.
-    3. Gemini Fallback with 404 Fix.
-    """
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
@@ -127,16 +122,13 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- NEW: THE CENTER CROP ---
-                    # Focuses on the middle 50% where the Pokemon usually is
-                    # This removes edge background noise that causes false matches
+                    # --- THE SHADOW-KILLER CROP (800x480) ---
+                    # We crop out the edges and the bottom 25% (where shadows live)
                     w, h = img.size
-                    left, top, right, bottom = w//4, h//4, (3*w)//4, (3*h)//4
+                    left, top, right, bottom = w//4, h//8, (3*w)//4, int(h*0.75)
                     cropped_img = img.crop((left, top, right, bottom))
                     
-                    # Generate hash from the CROPPED image
                     live_hash = imagehash.dhash(cropped_img)
-                    
                     best_match = None
                     min_dist = 64 
                     
@@ -144,42 +136,41 @@ async def get_ai_identification(image_url):
                         stored_hash = imagehash.hex_to_hash(h_str)
                         dist = live_hash - stored_hash
                         
-                        # ⭐ GOLDEN MATCH: Instant Fire
-                        if dist <= 3:
+                        if dist <= 4: # Near Perfect
                             print(f"🎯 [SNIPER] High Confidence: {name} (Dist: {dist})", flush=True)
                             return name
-                        
                         if dist < min_dist:
                             min_dist = dist
                             best_match = name
                     
-                    # 🥈 FUZZY MATCH: Strict threshold (Reduced from 10 to 7 for accuracy)
-                    if best_match and min_dist <= 7:
+                    # Fuzzy match threshold
+                    if best_match and min_dist <= 14:
                         print(f"🎯 [SNIPER] Fuzzy Match: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: THE GEMINI FALLBACK (Fixes 404) ---
+                    # --- STAGE 2: THE GEMINI FIX (404 GONE) ---
                     print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
                     
-                    prompt = "Identify this Pokemon sprite. Return just ONLY the name. Be 100% accurate."
-                    
-                    # Fix: Added 'models/' prefix to the model name
-                    response = client.models.generate_content(
-                        model="models/gemini-1.5-flash", 
-                        contents=[
-                            prompt,
-                            types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
-                        ]
-                    )
-                    
-                    # Extract and clean
-                    name_raw = response.text.strip().split()[0].upper()
-                    return "".join(c for c in name_raw if c.isalpha())
-                    
+                    # Using the strictly correct model path for the current SDK
+                    model_path = "models/gemini-1.5-flash"
+                    try:
+                        response = client.models.generate_content(
+                            model=model_path,
+                            contents=[
+                                "Identify this Pokemon. Return ONLY the name.",
+                                types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
+                            ]
+                        )
+                        ai_name = response.text.strip().split()[0].upper()
+                        return "".join(c for c in ai_name if c.isalpha())
+                    except Exception as ai_e:
+                        print(f"⚠️ Gemini API failed: {ai_e}", flush=True)
+                        return None
+                        
     except Exception as e: 
         print(f"👁️ Vision Error: {e}", flush=True)
     return None
-
+    
 
 
 
