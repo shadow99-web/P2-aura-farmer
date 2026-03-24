@@ -16,6 +16,17 @@ from flask import Flask
 from threading import Thread
 import difflib
 import sys 
+import imagehash 
+# --- SNIPER DATABASE LOADER ---
+HASH_DATABASE = {}
+try:
+    # Render automatically pulls your p2_master_hashes.json from GitHub
+    with open("p2_master_hashes.json", "r") as f:
+        HASH_DATABASE = json.load(f)
+    print(f"✅ [SNIPER] Database Loaded: {len(HASH_DATABASE)} fingerprints active.", flush=True)
+except Exception as e:
+    print(f"⚠️ [SNIPER] Database load failed: {e}. Bot will use Gemini only.", flush=True)
+    
 
 # --- CRITICAL FIX FOR 'NoneType' object is not iterable ---
 from discord.state import ConnectionState
