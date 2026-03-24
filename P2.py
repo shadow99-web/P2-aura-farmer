@@ -110,16 +110,52 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 async def get_ai_identification(image_url):
+    """
+    ULTIMATE SEQUENTIAL SNIPER:
+    1. Scan local pHash database (Instant & Free).
+    2. If confidence is > 90%, return name immediately.
+    3. ONLY if pHash fails, call Gemini Vision API.
+    """
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
                 if resp.status == 200:
                     img_data = await resp.read()
                     
-                    # Your original prompt
+                    # Convert bytes to Image for hashing
+                    img = Image.open(BytesIO(img_data))
+                    
+                    # --- STAGE 1: THE PHASH EXHAUSTION ---
+                    live_hash = imagehash.dhash(img)
+                    best_match = None
+                    min_dist = 64 
+                    
+                    # Bruteforce search through your master JSON
+                    for h_str, name in HASH_DATABASE.items():
+                        stored_hash = imagehash.hex_to_hash(h_str)
+                        dist = live_hash - stored_hash
+                        
+                        # ⭐ GOLDEN MATCH: Instant Fire
+                        if dist <= 3:
+                            print(f"🎯 [SNIPER] High Confidence: {name} (Dist: {dist})", flush=True)
+                            return name
+                        
+                        # Keep track of the closest possible candidate
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_match = name
+                    
+                    # 🥈 SILVER MATCH: Fuzzy confidence (Acceptable distance)
+                    if best_match and min_dist <= 10:
+                        print(f"🎯 [SNIPER] Fuzzy Match: {best_match} (Dist: {min_dist})", flush=True)
+                        return best_match
+
+                    # --- STAGE 2: THE GEMINI FALLBACK ---
+                    # Only runs if Stage 1 didn't return a name
+                    print(f"🤖 [SYSTEM] pHash uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
+                    
                     prompt = "Identify this Pokemon sprite. Return just ONLY the name. No other text or punctuation."
                     
-                    # Updated syntax for the new google-genai package
                     response = client.models.generate_content(
                         model="gemini-1.5-flash",
                         contents=[
@@ -128,12 +164,14 @@ async def get_ai_identification(image_url):
                         ]
                     )
                     
-                    # Extract the first word and clean it
+                    # Extract the first word and clean it exactly as before
                     name = response.text.strip().split()[0]
                     return "".join(c for c in name if c.isalpha())
+                    
     except Exception as e: 
-        print(f"AI Vision Error: {e}")
+        print(f"👁️ Vision Error: {e}", flush=True)
     return None
+
 
 
 # --- CONFIG & GLOBALS ---
