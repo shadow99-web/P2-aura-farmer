@@ -385,6 +385,32 @@ def setup_events(alt_client, nickname):
                 await message.channel.send(f"✅ **{nickname} Spammer Resumed.**")
             elif cmd == ".ping": 
                 await message.channel.send(f"🏓 `{nickname}` Pong! `{round(alt_client.latency * 1000)}ms`")
+            
+            
+            elif cmd.startswith(".test "):
+                # Usage: .test [image_url]
+                test_url = content[6:].strip()
+                if not test_url:
+                    await message.channel.send("❌ **Please provide an image URL to test!**")
+                    return
+                
+                await message.channel.send("🔍 **Testing Sniper Vision...**")
+                
+                # This triggers the EXACT same logic the bot uses for real spawns
+                start_time = asyncio.get_event_loop().time()
+                result = await get_ai_identification(test_url)
+                end_time = asyncio.get_event_loop().time()
+                
+                duration = round(end_time - start_time, 2)
+                
+                if result:
+                    await message.channel.send(
+                        f"✅ **Result:** `{result}`\n"
+                        f"⏱️ **Time taken:** `{duration}s`"
+                    )
+                else:
+                    await message.channel.send("❌ **Sniper & Gemini both failed to identify this.**")
+          
             elif cmd == ".check":
                 await message.channel.send("<@716390085896962058> bal")
             elif cmd.startswith(".s "):
