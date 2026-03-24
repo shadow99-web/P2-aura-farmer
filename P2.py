@@ -119,64 +119,52 @@ async def get_ai_identification(image_url):
             async with session.get(image_url) as resp:
                 if resp.status == 200:
                     img_data = await resp.read()
-                    # Open and convert to RGBA to handle transparency correctly
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- THE SHAPE-ENHANCER CROP ---
-                    w, h = img.size
-                    # We crop to the center-top to avoid the shadow and ground
-                    # (left, top, right, bottom)
-                    cropped = img.crop((w//4, h//10, (3*w)//4, int(h*0.70)))
+                    # --- COUNTER-MEASURE: SILHOUETTE EXTRACTION ---
+                    # This finds the actual Pokemon body and ignores the random grass/shadow
+                    alpha = img.getchannel('A')
+                    bbox = alpha.getbbox() # Finds the "Box" where the Pokemon actually is
+                    if bbox:
+                        # Crop tightly to the Pokemon, then resize to a standard 128x128
+                        pokemon_only = img.crop(bbox).resize((128, 128))
+                    else:
+                        pokemon_only = img.resize((128, 128))
+
+                    # Convert to Black & White to kill the "Dynamic Shadow" they mentioned
+                    # This makes the pHash only see the SHAPE (Silhouette)
+                    bw_shape = pokemon_only.convert("L").point(lambda x: 0 if x < 100 else 255, '1')
                     
-                    # ENHANCE SHAPE: Convert to grayscale and increase contrast
-                    # This makes the Pokemon "Shape" stand out from the forest
-                    shape_focus = cropped.convert("L").point(lambda x: 0 if x < 128 else 255, '1')
-                    
-                    live_hash = imagehash.dhash(shape_focus)
+                    live_hash = imagehash.phash(bw_shape) # Switching to pHash for shape accuracy
                     best_match = None
                     min_dist = 64 
                     
                     for h_str, name in HASH_DATABASE.items():
-                        stored_hash = imagehash.hex_to_hash(h_str)
-                        dist = live_hash - stored_hash
-                        
-                        if dist <= 6: # Golden Match (Higher tolerance for the new shape focus)
-                            print(f"🎯 [SNIPER] High Confidence: {name} (Dist: {dist})", flush=True)
+                        dist = live_hash - imagehash.hex_to_hash(h_str)
+                        if dist <= 5: # Golden Shape Match
+                            print(f"🎯 [SNIPER] Shape ID Success: {name} (Dist: {dist})", flush=True)
                             return name
                         if dist < min_dist:
                             min_dist = dist
                             best_match = name
                     
-                    # FUZZY MATCH: Only allow if it's very close (Distance 12 or less)
-                    # This prevents calling Croagunk a 'Blitzle'
-                    if best_match and min_dist <= 12:
-                        print(f"🎯 [SNIPER] Fuzzy Match: {best_match} (Dist: {min_dist})", flush=True)
+                    if best_match and min_dist <= 14: # Safe Fuzzy Limit
+                        print(f"🎯 [SNIPER] Fuzzy Shape Match: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: THE GEMINI STABLE VERSION ---
-                    print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
-                    
-                    # We use the most compatible model string for v1beta API
-                    model_to_use = "models/gemini-1.5-flash"
+                    # --- STAGE 2: THE GEMINI STABLE FALLBACK ---
+                    print(f"🤖 [SYSTEM] Anti-Cheat active. Calling Gemini (Best Dist: {min_dist})...", flush=True)
                     try:
                         response = client.models.generate_content(
-                            model=model_to_use,
+                            model="models/gemini-1.5-flash", 
                             contents=[
                                 "Identify this Pokemon. Return ONLY the name.",
                                 types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
                             ]
                         )
-                        ai_name = response.text.strip().split()[0].upper()
-                        return "".join(c for c in ai_name if c.isalpha())
-                    except Exception as ai_err:
-                        # SECOND ATTEMPT with direct alias if first fails
-                        print(f"⚠️ Primary API failed, trying alias...", flush=True)
-                        response = client.models.generate_content(
-                            model="gemini-1.5-flash",
-                            contents=["Identify this Pokemon. Return ONLY the name.", types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
-                        )
                         return response.text.strip().split()[0].upper()
-                        
+                    except:
+                        return None
     except Exception as e: 
         print(f"👁️ Vision Error: {e}", flush=True)
     return None
