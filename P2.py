@@ -115,26 +115,31 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 async def get_ai_identification(image_url):
     """
-    ULTIMATE SEQUENTIAL SNIPER:
-    1. Scan local pHash database (Instant & Free).
-    2. If confidence is > 90%, return name immediately.
-    3. ONLY if pHash fails, call Gemini Vision API.
+    ULTIMATE SEQUENTIAL SNIPER (V2):
+    1. Focus on center (ignore background).
+    2. Bruteforce pHash database.
+    3. Gemini Fallback with 404 Fix.
     """
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
                 if resp.status == 200:
                     img_data = await resp.read()
+                    img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # Convert bytes to Image for hashing
-                    img = Image.open(BytesIO(img_data))
+                    # --- NEW: THE CENTER CROP ---
+                    # Focuses on the middle 50% where the Pokemon usually is
+                    # This removes edge background noise that causes false matches
+                    w, h = img.size
+                    left, top, right, bottom = w//4, h//4, (3*w)//4, (3*h)//4
+                    cropped_img = img.crop((left, top, right, bottom))
                     
-                    # --- STAGE 1: THE PHASH EXHAUSTION ---
-                    live_hash = imagehash.dhash(img)
+                    # Generate hash from the CROPPED image
+                    live_hash = imagehash.dhash(cropped_img)
+                    
                     best_match = None
                     min_dist = 64 
                     
-                    # Bruteforce search through your master JSON
                     for h_str, name in HASH_DATABASE.items():
                         stored_hash = imagehash.hex_to_hash(h_str)
                         dist = live_hash - stored_hash
@@ -144,37 +149,37 @@ async def get_ai_identification(image_url):
                             print(f"🎯 [SNIPER] High Confidence: {name} (Dist: {dist})", flush=True)
                             return name
                         
-                        # Keep track of the closest possible candidate
                         if dist < min_dist:
                             min_dist = dist
                             best_match = name
                     
-                    # 🥈 SILVER MATCH: Fuzzy confidence (Acceptable distance)
-                    if best_match and min_dist <= 10:
+                    # 🥈 FUZZY MATCH: Strict threshold (Reduced from 10 to 7 for accuracy)
+                    if best_match and min_dist <= 7:
                         print(f"🎯 [SNIPER] Fuzzy Match: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: THE GEMINI FALLBACK ---
-                    # Only runs if Stage 1 didn't return a name
-                    print(f"🤖 [SYSTEM] pHash uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
+                    # --- STAGE 2: THE GEMINI FALLBACK (Fixes 404) ---
+                    print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
                     
-                    prompt = "Identify this Pokemon sprite. Return just ONLY the name. No other text or punctuation."
+                    prompt = "Identify this Pokemon sprite. Return just ONLY the name. Be 100% accurate."
                     
+                    # Fix: Added 'models/' prefix to the model name
                     response = client.models.generate_content(
-                        model="gemini-1.5-flash",
+                        model="models/gemini-1.5-flash", 
                         contents=[
                             prompt,
                             types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
                         ]
                     )
                     
-                    # Extract the first word and clean it exactly as before
-                    name = response.text.strip().split()[0]
-                    return "".join(c for c in name if c.isalpha())
+                    # Extract and clean
+                    name_raw = response.text.strip().split()[0].upper()
+                    return "".join(c for c in name_raw if c.isalpha())
                     
     except Exception as e: 
         print(f"👁️ Vision Error: {e}", flush=True)
     return None
+
 
 
 
