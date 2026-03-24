@@ -17,7 +17,7 @@ from threading import Thread
 import difflib
 import sys 
 import imagehash 
-from PIL import Image
+from PIL import Image, ImageFilter
 from io import BytesIO
 import json 
 
@@ -113,7 +113,15 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Using the new Client structure
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+
 async def get_ai_identification(image_url):
+    """
+    STRICT SEQUENTIAL SNIPER (SHAPE-ONLY MODE):
+    1. Apply Gaussian Blur to reset sharpness anti-cheat.
+    2. Extract Alpha Bounding Box to ignore grass fields.
+    3. Convert to high-contrast B&W silhouette to kill shadows.
+    4. Bruteforce pHash database -> Gemini 1.5 Fallback.
+    """
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
@@ -121,39 +129,42 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- COUNTER-MEASURE: SILHOUETTE EXTRACTION ---
-                    # This finds the actual Pokemon body and ignores the random grass/shadow
+                    # --- COUNTER-MEASURE 1: SHARPNESS RESET ---
+                    # Smudges the pixel-level alterations mentioned by the devs
+                    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+                    
+                    # --- COUNTER-MEASURE 2: DYNAMIC POSITION/BACKGROUND BYPASS ---
+                    # Finds the actual Pokemon pixels and ignores the 'Grass Field'
                     alpha = img.getchannel('A')
-                    bbox = alpha.getbbox() # Finds the "Box" where the Pokemon actually is
+                    bbox = alpha.getbbox() 
                     if bbox:
-                        # Crop tightly to the Pokemon, then resize to a standard 128x128
+                        # Crop tight to body and normalize to 128x128
                         pokemon_only = img.crop(bbox).resize((128, 128))
                     else:
                         pokemon_only = img.resize((128, 128))
 
-                    # Convert to Black & White to kill the "Dynamic Shadow" they mentioned
-                    # This makes the pHash only see the SHAPE (Silhouette)
-                    bw_shape = pokemon_only.convert("L").point(lambda x: 0 if x < 100 else 255, '1')
+                    # --- COUNTER-MEASURE 3: SHADOW-KILLER SILHOUETTE ---
+                    # Converts to strict Black & White silhouette
+                    bw_shape = pokemon_only.convert("L").point(lambda x: 0 if x < 110 else 255, '1')
                     
-                    live_hash = imagehash.phash(bw_shape) # Switching to pHash for shape accuracy
-                    best_match = None
-                    min_dist = 64 
+                    live_hash = imagehash.phash(bw_shape)
+                    best_match, min_dist = None, 64
                     
                     for h_str, name in HASH_DATABASE.items():
                         dist = live_hash - imagehash.hex_to_hash(h_str)
                         if dist <= 5: # Golden Shape Match
-                            print(f"🎯 [SNIPER] Shape ID Success: {name} (Dist: {dist})", flush=True)
+                            print(f"🎯 [SNIPER] Shape Match: {name} (Dist: {dist})", flush=True)
                             return name
                         if dist < min_dist:
-                            min_dist = dist
-                            best_match = name
+                            best_match, min_dist = name, dist
                     
-                    if best_match and min_dist <= 14: # Safe Fuzzy Limit
+                    # FUZZY MATCH (Only if quite certain)
+                    if best_match and min_dist <= 14:
                         print(f"🎯 [SNIPER] Fuzzy Shape Match: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: THE GEMINI STABLE FALLBACK ---
-                    print(f"🤖 [SYSTEM] Anti-Cheat active. Calling Gemini (Best Dist: {min_dist})...", flush=True)
+                    # --- STAGE 2: GEMINI STABLE FALLBACK ---
+                    print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
                     try:
                         response = client.models.generate_content(
                             model="models/gemini-1.5-flash", 
@@ -162,14 +173,16 @@ async def get_ai_identification(image_url):
                                 types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
                             ]
                         )
-                        return response.text.strip().split()[0].upper()
-                    except:
+                        ai_name = response.text.strip().split()[0].upper()
+                        return "".join(c for c in ai_name if c.isalpha())
+                    except Exception as ai_err:
+                        print(f"⚠️ Gemini Failed: {ai_err}", flush=True)
                         return None
+                        
     except Exception as e: 
         print(f"👁️ Vision Error: {e}", flush=True)
     return None
     
-
 
 
 # --- CONFIG & GLOBALS ---
