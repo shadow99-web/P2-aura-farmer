@@ -4,3 +4,5 @@ google-genai
 requests
 pytz
 flask
+Pillow
+imagehash
