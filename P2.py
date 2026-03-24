@@ -17,7 +17,7 @@ from threading import Thread
 import difflib
 import sys 
 import imagehash 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 from io import BytesIO
 import json 
 import unicodedata
