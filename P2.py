@@ -20,6 +20,7 @@ import imagehash
 from PIL import Image, ImageFilter
 from io import BytesIO
 import json 
+import unicodedata
 
 # --- SNIPER DATABASE LOADER ---
 HASH_DATABASE = {}
@@ -113,14 +114,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Using the new Client structure
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-
 async def get_ai_identification(image_url):
     """
-    STRICT SEQUENTIAL SNIPER (SHAPE-ONLY MODE):
-    1. Apply Gaussian Blur to reset sharpness anti-cheat.
-    2. Extract Alpha Bounding Box to ignore grass fields.
-    3. Convert to high-contrast B&W silhouette to kill shadows.
-    4. Bruteforce pHash database -> Gemini 1.5 Fallback.
+    STARK REWRITE COUNTER-MEASURE:
+    - Uses Whash (Wavelet) to beat 'Dynamic Noise'.
+    - Uses Homograph Normalization to beat 'Fake Letter' names.
+    - Uses Alpha-Composite Gray to kill 'Sharpness' tricks.
     """
     try:
         async with aiohttp.ClientSession() as session:
@@ -129,58 +128,48 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- COUNTER-MEASURE 1: SHARPNESS RESET ---
-                    # Smudges the pixel-level alterations mentioned by the devs
-                    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
-                    
-                    # --- COUNTER-MEASURE 2: DYNAMIC POSITION/BACKGROUND BYPASS ---
-                    # Finds the actual Pokemon pixels and ignores the 'Grass Field'
+                    # --- NOISE-KILLER: ALPHA + NEUTRAL GRAY ---
                     alpha = img.getchannel('A')
-                    bbox = alpha.getbbox() 
+                    bbox = alpha.getbbox()
                     if bbox:
-                        # Crop tight to body and normalize to 128x128
-                        pokemon_only = img.crop(bbox).resize((128, 128))
+                        img_only = img.crop(bbox)
+                        # Neutral Gray (128) is the hardest background for 
+                        # 'Sharpness' and 'Pixel Shift' anti-cheats to hide in.
+                        bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
+                        normalized = Image.alpha_composite(bg, img_only).convert("L")
+                        # LANCZOS resampling smooths out the 'Rewrite' noise
+                        normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
                     else:
-                        pokemon_only = img.resize((128, 128))
+                        normalized = img.convert("L").resize((128, 128))
 
-                    # --- COUNTER-MEASURE 3: SHADOW-KILLER SILHOUETTE ---
-                    # Converts to strict Black & White silhouette
-                    bw_shape = pokemon_only.convert("L").point(lambda x: 0 if x < 110 else 255, '1')
-                    
-                    live_hash = imagehash.phash(bw_shape)
-                    best_match, min_dist = None, 64
+                    # WHASH: The Wavelet Hash is the king of noise resistance.
+                    live_hash = imagehash.whash(normalized)
+                    best_match, min_dist = None, 64 
                     
                     for h_str, name in HASH_DATABASE.items():
                         dist = live_hash - imagehash.hex_to_hash(h_str)
-                        if dist <= 5: # Golden Shape Match
-                            print(f"🎯 [SNIPER] Shape Match: {name} (Dist: {dist})", flush=True)
+                        if dist <= 12: # Whash is more robust, we allow up to 12
+                            print(f"🎯 [SNIPER] Whash ID: {name} (Dist: {dist})", flush=True)
                             return name
                         if dist < min_dist:
                             best_match, min_dist = name, dist
                     
-                    # FUZZY MATCH (Only if quite certain)
-                    if best_match and min_dist <= 14:
-                        print(f"🎯 [SNIPER] Fuzzy Shape Match: {best_match} (Dist: {min_dist})", flush=True)
+                    if best_match and min_dist <= 22: # Higher threshold for the rewrite era
+                        print(f"🎯 [SNIPER] Fuzzy Whash: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: GEMINI STABLE FALLBACK ---
-                    print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
+                    # --- GEMINI STABLE FIX (404 GONE) ---
+                    print(f"🤖 [SYSTEM] Calling Gemini (Best: {min_dist})...", flush=True)
                     try:
                         response = client.models.generate_content(
-                            model="models/gemini-1.5-flash", 
-                            contents=[
-                                "Identify this Pokemon. Return ONLY the name.",
-                                types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
-                            ]
+                            model="gemini-1.5-flash",
+                            contents=["Identify this Pokemon. Return ONLY the name.", types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
                         )
-                        ai_name = response.text.strip().split()[0].upper()
-                        return "".join(c for c in ai_name if c.isalpha())
-                    except Exception as ai_err:
-                        print(f"⚠️ Gemini Failed: {ai_err}", flush=True)
-                        return None
-                        
-    except Exception as e: 
-        print(f"👁️ Vision Error: {e}", flush=True)
+                        raw_name = response.text.strip().split()[0].upper()
+                        # Normalize characters (Beats the 'а' vs 'a' trick from Professor Oak)
+                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalnum()))
+                    except: return None
+    except Exception as e: print(f"Vision Error: {e}")
     return None
     
 
@@ -422,6 +411,68 @@ def setup_events(alt_client, nickname):
                 else:
                     await message.channel.send("❌ **Sniper & Gemini both failed to identify this.**")
           
+              
+            elif cmd.startswith(".save "):
+                # Usage: Reply to a spawn with ".save Pikachu"
+                target_name = content[6:].strip().upper()
+                if not message.reference:
+                    await message.channel.send("❌ Reply to a spawn first!")
+                    return
+
+                replied_msg = await message.channel.fetch_message(message.reference.message_id)
+                img_url = replied_msg.embeds[0].image.url if replied_msg.embeds else None
+                if not img_url: return
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(img_url) as resp:
+                        if resp.status == 200:
+                            img_data = await resp.read()
+                            img = Image.open(BytesIO(img_data)).convert("RGBA")
+                            
+                            # --- STANDARDIZED REWRITE-PROOF NORMALIZATION ---
+                            alpha = img.getchannel('A')
+                            bbox = alpha.getbbox()
+                            if bbox:
+                                img_only = img.crop(bbox)
+                                bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
+                                normalized = Image.alpha_composite(bg, img_only).convert("L")
+                                normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
+                            else:
+                                normalized = img.convert("L").resize((128, 128))
+
+                            new_hash = str(imagehash.whash(normalized))
+                            
+                            # --- GITHUB AUTO-SYNC ---
+                            repo_url = f"https://api.github.com/repos/{REPO_NAME}/contents/p2_master_hashes.json"
+                            headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+                            
+                            try:
+                                # 1. Get current JSON
+                                g_resp = requests.get(repo_url, headers=headers)
+                                if g_resp.status_code == 200:
+                                    g_data = g_resp.json()
+                                    current_json = json.loads(base64.b64decode(g_data['content']).decode('utf-8'))
+                                    
+                                    # 2. Add new data
+                                    current_json[new_hash] = target_name
+                                    HASH_DATABASE[new_hash] = target_name # Update local memory too
+                                    
+                                    # 3. Push back to GitHub
+                                    updated_content = json.dumps(current_json, indent=4)
+                                    payload = {
+                                        "message": f"Auto-Learn: {target_name}",
+                                        "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
+                                        "sha": g_data['sha']
+                                    }
+                                    put_r = requests.put(repo_url, headers=headers, json=payload)
+                                    
+                                    if put_r.status_code in [200, 201]:
+                                        await message.channel.send(f"✅ **Learned {target_name}!**\nHash: `{new_hash}` synced to GitHub.")
+                                    else:
+                                        await message.channel.send("⚠️ Saved locally, but GitHub sync failed.")
+                            except Exception as e:
+                                await message.channel.send(f"❌ Error: {e}")
+                                
             elif cmd == ".check":
                 await message.channel.send("<@716390085896962058> bal")
             elif cmd.startswith(".s "):
