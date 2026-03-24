@@ -113,63 +113,66 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Using the new Client structure
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-
 async def get_ai_identification(image_url):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
                 if resp.status == 200:
                     img_data = await resp.read()
+                    # Open and convert to RGBA to handle transparency correctly
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- IMPROVED SHADOW-KILLER CROP ---
+                    # --- THE SHAPE-ENHANCER CROP ---
                     w, h = img.size
-                    # We tighten the crop even more to ignore the shadow completely
-                    # left, top, right, bottom
-                    cropped_img = img.crop((w//4, h//8, (3*w)//4, int(h*0.68)))
+                    # We crop to the center-top to avoid the shadow and ground
+                    # (left, top, right, bottom)
+                    cropped = img.crop((w//4, h//10, (3*w)//4, int(h*0.70)))
                     
-                    live_hash = imagehash.dhash(cropped_img)
+                    # ENHANCE SHAPE: Convert to grayscale and increase contrast
+                    # This makes the Pokemon "Shape" stand out from the forest
+                    shape_focus = cropped.convert("L").point(lambda x: 0 if x < 128 else 255, '1')
+                    
+                    live_hash = imagehash.dhash(shape_focus)
                     best_match = None
                     min_dist = 64 
                     
                     for h_str, name in HASH_DATABASE.items():
-                        dist = live_hash - imagehash.hex_to_hash(h_str)
+                        stored_hash = imagehash.hex_to_hash(h_str)
+                        dist = live_hash - stored_hash
                         
-                        if dist <= 5: # Golden Match
+                        if dist <= 6: # Golden Match (Higher tolerance for the new shape focus)
                             print(f"🎯 [SNIPER] High Confidence: {name} (Dist: {dist})", flush=True)
                             return name
                         if dist < min_dist:
                             min_dist = dist
                             best_match = name
                     
-                    # --- INCREASED FUZZY THRESHOLD ---
-                    # Since your logs showed '15', we move this to '18' to catch it!
-                    if best_match and min_dist <= 18:
+                    # FUZZY MATCH: Only allow if it's very close (Distance 12 or less)
+                    # This prevents calling Croagunk a 'Blitzle'
+                    if best_match and min_dist <= 12:
                         print(f"🎯 [SNIPER] Fuzzy Match: {best_match} (Dist: {min_dist})", flush=True)
                         return best_match
 
-                    # --- STAGE 2: THE GEMINI STABLE FIX ---
+                    # --- STAGE 2: THE GEMINI STABLE VERSION ---
                     print(f"🤖 [SYSTEM] Sniper uncertain (Best: {min_dist}). Calling Gemini...", flush=True)
                     
+                    # We use the most compatible model string for v1beta API
+                    model_to_use = "models/gemini-1.5-flash"
                     try:
-                        # CHANGE: Use "gemini-1.5-flash-latest" or "models/gemini-1.5-flash"
-                        # We will try the most stable one for v1beta:
                         response = client.models.generate_content(
-                            model="gemini-1.5-flash", 
+                            model=model_to_use,
                             contents=[
                                 "Identify this Pokemon. Return ONLY the name.",
                                 types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
-                            ],
-                            # FORCE the API version if the SDK allows it
-                            config=types.GenerateContentConfig(candidate_count=1)
+                            ]
                         )
                         ai_name = response.text.strip().split()[0].upper()
                         return "".join(c for c in ai_name if c.isalpha())
                     except Exception as ai_err:
-                        # If the new SDK is still failing, we try the fallback string
-                        print(f"⚠️ Gemini primary failed, trying fallback string...", flush=True)
+                        # SECOND ATTEMPT with direct alias if first fails
+                        print(f"⚠️ Primary API failed, trying alias...", flush=True)
                         response = client.models.generate_content(
-                            model="models/gemini-1.5-flash-001",
+                            model="gemini-1.5-flash",
                             contents=["Identify this Pokemon. Return ONLY the name.", types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
                         )
                         return response.text.strip().split()[0].upper()
@@ -177,7 +180,7 @@ async def get_ai_identification(image_url):
     except Exception as e: 
         print(f"👁️ Vision Error: {e}", flush=True)
     return None
-   
+    
 
 
 
