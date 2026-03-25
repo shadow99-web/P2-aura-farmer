@@ -123,12 +123,16 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # STEP 1: ISOLATION (The 'Lens' Secret)
-                    # We strip the background so the 'Forest' can't trick the bot anymore.
+                    # COUNTER-MEASURE 1: The Blur-Reset [1]
+                    # Neutralizes pixel-level sharpness anti-cheat adjustments.
+                    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+                    
+                    # COUNTER-MEASURE 2: Alpha Bounding Box 
+                    # Loophole: Backgrounds change, but the transparency mask is constant.
                     alpha = img.getchannel('A')
-                    bbox = alpha.getbbox()
+                    bbox = alpha.getbbox() # Automatically "finds" the Pokemon
                     if bbox:
-                        # Normalize to a neutral grey background to kill 'Sharpness' noise
+                        # Normalize shape to a 128x128 Neutral Gray baseline
                         img_only = img.crop(bbox)
                         bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
                         normalized = Image.alpha_composite(bg, img_only).convert("L")
@@ -136,26 +140,32 @@ async def get_ai_identification(image_url):
                     else:
                         normalized = img.convert("L").resize((128, 128))
 
-                    # STEP 2: WAVELET HASHING
+                    # COUNTER-MEASURE 3: Wavelet Hashing (wHash) [2, 3]
+                    # Loophole: Standard pHash is weak to the 'noise' shown in Mewtwo logs.
+                    # wHash is spatially local and ignores additive background noise.
                     live_hash = imagehash.whash(normalized)
                     best_match, min_dist = None, 64 
                     
                     for h_str, name in HASH_DATABASE.items():
                         dist = live_hash - imagehash.hex_to_hash(h_str)
-                        if dist <= 10: return name # High Confidence
+                        if dist <= 12: # High-precision wHash threshold
+                            return name
                         if dist < min_dist:
                             best_match, min_dist = name, dist
                     
-                    # STEP 3: THE "GOOGLE LENS" FALLBACK
-                    # If the math is even slightly unsure, we let the AI Brain decide.
-                    print(f"🤖 [SYSTEM] Sniper distance {min_dist} is too high. Using AI Vision...")
+                    if best_match and min_dist <= 22: # Adaptive Fuzzy Limit
+                        return best_match
+
+                    # LAYER 2: GEMINI MULTIMODAL BACKUP [4]
+                    # Exploits the loophole that AI vision can see through spatial reasoning bugs.
                     try:
                         response = client.models.generate_content(
-                            model="gemini-1.5-flash",
-                            contents=["Identify this Pokemon. Return ONLY the name.", 
-                                      types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
+                            model="models/gemini-1.5-flash",
+                            contents=
                         )
-                        return "".join(c for c in response.text.strip().split()[0] if c.isalpha()).upper()
+                        # Normalize to Latin characters to bypass Homograph attacks (U+0430) 
+                        raw_name = response.text.strip().split().upper()
+                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalnum()))
                     except: return None
     except Exception as e: print(f"Vision Error: {e}")
     return None
