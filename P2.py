@@ -414,7 +414,7 @@ def setup_events(alt_client, nickname):
                         f"⏱️ **Time taken:** `{duration}s`"
                     )
                 else:
-                    await message.channel.send("❌ **Sniper & Gemini both failed to identify this.**")
+                    await message.channel.send("😔 **Sniper & Gemini both failed to identify this.**")
           
               
             elif cmd.startswith(".save "):
@@ -425,8 +425,16 @@ def setup_events(alt_client, nickname):
                     return
 
                 replied_msg = await message.channel.fetch_message(message.reference.message_id)
-                img_url = replied_msg.embeds[0].image.url if replied_msg.embeds else None
-                if not img_url: return
+                
+                # FIX: Check both Image and Thumbnail so training never fails
+                img_url = None
+                if replied_msg.embeds:
+                    embed = replied_msg.embeds[0]
+                    img_url = embed.image.url if embed.image else (embed.thumbnail.url if embed.thumbnail else None)
+                
+                if not img_url:
+                    await message.channel.send("❌ No image found in that message!")
+                    return
 
                 async with aiohttp.ClientSession() as session:
                     async with session.get(img_url) as resp:
@@ -434,7 +442,7 @@ def setup_events(alt_client, nickname):
                             img_data = await resp.read()
                             img = Image.open(BytesIO(img_data)).convert("RGBA")
                             
-                            # --- STANDARDIZED REWRITE-PROOF NORMALIZATION ---
+                            # Standardized Alpha-Masking (Matches the Sniper Logic)
                             alpha = img.getchannel('A')
                             bbox = alpha.getbbox()
                             if bbox:
@@ -447,36 +455,36 @@ def setup_events(alt_client, nickname):
 
                             new_hash = str(imagehash.whash(normalized))
                             
-                            # --- GITHUB AUTO-SYNC ---
+                            # GITHUB AUTO-SYNC
                             repo_url = f"https://api.github.com/repos/{REPO_NAME}/contents/p2_master_hashes.json"
                             headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
                             
                             try:
-                                # 1. Get current JSON
                                 g_resp = requests.get(repo_url, headers=headers)
                                 if g_resp.status_code == 200:
                                     g_data = g_resp.json()
                                     current_json = json.loads(base64.b64decode(g_data['content']).decode('utf-8'))
                                     
-                                    # 2. Add new data
+                                    # Update Database
                                     current_json[new_hash] = target_name
-                                    HASH_DATABASE[new_hash] = target_name # Update local memory too
+                                    HASH_DATABASE[new_hash] = target_name 
                                     
-                                    # 3. Push back to GitHub
                                     updated_content = json.dumps(current_json, indent=4)
                                     payload = {
                                         "message": f"Auto-Learn: {target_name}",
                                         "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
                                         "sha": g_data['sha']
-                                    }
+                                    } # Fixed the missing brace here
+                                    
                                     put_r = requests.put(repo_url, headers=headers, json=payload)
                                     
                                     if put_r.status_code in [200, 201]:
-                                        await message.channel.send(f"✅ **Learned {target_name}!**\nHash: `{new_hash}` synced to GitHub.")
+                                        await message.channel.send(f"✅ **Learned {target_name}!**\nHash: `{new_hash}`")
                                     else:
-                                        await message.channel.send("⚠️ Saved locally, but GitHub sync failed.")
+                                        await message.channel.send(f"⚠️ GitHub Sync Error: {put_r.status_code}")
                             except Exception as e:
-                                await message.channel.send(f"❌ Error: {e}")
+                                await message.channel.send(f"❌ Sync Failed: {e}")
+                                
                                 
             elif cmd == ".check":
                 await message.channel.send("<@716390085896962058> bal")
