@@ -114,13 +114,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Using the new Client structure
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+# --- THE "LENS-POWERED" SNIPER ---
 async def get_ai_identification(image_url):
-    """
-    STARK REWRITE COUNTER-MEASURE:
-    - Uses Whash (Wavelet) to beat 'Dynamic Noise'.
-    - Uses Homograph Normalization to beat 'Fake Letter' names.
-    - Uses Alpha-Composite Gray to kill 'Sharpness' tricks.
-    """
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as resp:
@@ -128,46 +123,39 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # --- NOISE-KILLER: ALPHA + NEUTRAL GRAY ---
+                    # STEP 1: ISOLATION (The 'Lens' Secret)
+                    # We strip the background so the 'Forest' can't trick the bot anymore.
                     alpha = img.getchannel('A')
                     bbox = alpha.getbbox()
                     if bbox:
+                        # Normalize to a neutral grey background to kill 'Sharpness' noise
                         img_only = img.crop(bbox)
-                        # Neutral Gray (128) is the hardest background for 
-                        # 'Sharpness' and 'Pixel Shift' anti-cheats to hide in.
                         bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
                         normalized = Image.alpha_composite(bg, img_only).convert("L")
-                        # LANCZOS resampling smooths out the 'Rewrite' noise
                         normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
                     else:
                         normalized = img.convert("L").resize((128, 128))
 
-                    # WHASH: The Wavelet Hash is the king of noise resistance.
+                    # STEP 2: WAVELET HASHING
                     live_hash = imagehash.whash(normalized)
                     best_match, min_dist = None, 64 
                     
                     for h_str, name in HASH_DATABASE.items():
                         dist = live_hash - imagehash.hex_to_hash(h_str)
-                        if dist <= 12: # Whash is more robust, we allow up to 12
-                            print(f"🎯 [SNIPER] Whash ID: {name} (Dist: {dist})", flush=True)
-                            return name
+                        if dist <= 10: return name # High Confidence
                         if dist < min_dist:
                             best_match, min_dist = name, dist
                     
-                    if best_match and min_dist <= 22: # Higher threshold for the rewrite era
-                        print(f"🎯 [SNIPER] Fuzzy Whash: {best_match} (Dist: {min_dist})", flush=True)
-                        return best_match
-
-                    # --- GEMINI STABLE FIX (404 GONE) ---
-                    print(f"🤖 [SYSTEM] Calling Gemini (Best: {min_dist})...", flush=True)
+                    # STEP 3: THE "GOOGLE LENS" FALLBACK
+                    # If the math is even slightly unsure, we let the AI Brain decide.
+                    print(f"🤖 [SYSTEM] Sniper distance {min_dist} is too high. Using AI Vision...")
                     try:
                         response = client.models.generate_content(
                             model="gemini-1.5-flash",
-                            contents=["Identify this Pokemon. Return ONLY the name.", types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
+                            contents=["Identify this Pokemon. Return ONLY the name.", 
+                                      types.Part.from_bytes(data=img_data, mime_type="image/jpeg")]
                         )
-                        raw_name = response.text.strip().split()[0].upper()
-                        # Normalize characters (Beats the 'а' vs 'a' trick from Professor Oak)
-                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalnum()))
+                        return "".join(c for c in response.text.strip().split()[0] if c.isalpha()).upper()
                     except: return None
     except Exception as e: print(f"Vision Error: {e}")
     return None
