@@ -123,53 +123,60 @@ async def get_ai_identification(image_url):
                     img_data = await resp.read()
                     img = Image.open(BytesIO(img_data)).convert("RGBA")
                     
-                    # COUNTER-MEASURE 1: The Blur-Reset [1]
-                    # Neutralizes pixel-level sharpness anti-cheat adjustments.
-                    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+                    # --- NOISE REDUCTION ---
+                    # We slightly blur to smooth out the 'Sharpness' anti-cheat 
+                    # that creates the 'tail difference' you saw.
+                    img = img.filter(ImageFilter.GaussianBlur(radius=0.3))
                     
-                    # COUNTER-MEASURE 2: Alpha Bounding Box 
-                    # Loophole: Backgrounds change, but the transparency mask is constant.
+                    # --- ALPHA BOUNDING BOX (The Background Killer) ---
                     alpha = img.getchannel('A')
-                    bbox = alpha.getbbox() # Automatically "finds" the Pokemon
+                    bbox = alpha.getbbox() 
                     if bbox:
-                        # Normalize shape to a 128x128 Neutral Gray baseline
+                        # We CROP the forest away. This is how we beat the 20% data loss.
                         img_only = img.crop(bbox)
+                        # We place the Pokemon on the SAME Neutral Gray baseline
                         bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
                         normalized = Image.alpha_composite(bg, img_only).convert("L")
                         normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
                     else:
                         normalized = img.convert("L").resize((128, 128))
 
-                    # COUNTER-MEASURE 3: Wavelet Hashing (wHash) [2, 3]
-                    # Loophole: Standard pHash is weak to the 'noise' shown in Mewtwo logs.
-                    # wHash is spatially local and ignores additive background noise.
+                    # WAVELET HASH: spatially local, ignores additive noise.
                     live_hash = imagehash.whash(normalized)
                     best_match, min_dist = None, 64 
                     
                     for h_str, name in HASH_DATABASE.items():
                         dist = live_hash - imagehash.hex_to_hash(h_str)
-                        if dist <= 12: # High-precision wHash threshold
+                        if dist <= 12: # Tight match
+                            print(f"🎯 [SNIPER] Match: {name} ({dist})")
                             return name
                         if dist < min_dist:
                             best_match, min_dist = name, dist
                     
-                    if best_match and min_dist <= 22: # Adaptive Fuzzy Limit
+                    if best_match and min_dist <= 22: # Fuzzy match
+                        print(f"🎯 [SNIPER] Fuzzy: {best_match} ({min_dist})")
                         return best_match
 
-                    # LAYER 2: GEMINI MULTIMODAL BACKUP [4]
-                    # Exploits the loophole that AI vision can see through spatial reasoning bugs.
+                    # --- LAYER 2: GEMINI 1.5 FLASH (The 'Human' Brain) ---
+                    print(f"🤖 [SYSTEM] Sniper uncertain ({min_dist}). Calling Gemini...")
                     try:
+                        # FIXED SYNTAX: Properly formatted contents list
                         response = client.models.generate_content(
-                            model="models/gemini-1.5-flash",
-                            contents=
+                            model="gemini-1.5-flash",
+                            contents=[
+                                "Identify this Pokemon. Return ONLY the name.",
+                                types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
+                            ]
                         )
-                        # Normalize to Latin characters to bypass Homograph attacks (U+0430) 
-                        raw_name = response.text.strip().split().upper()
-                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalnum()))
-                    except: return None
-    except Exception as e: print(f"Vision Error: {e}")
-    return None
-    
+                        # Normalize to Latin to beat Homograph attacks
+                        raw_name = response.text.strip().split()[0].upper()
+                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalpha()))
+                    except Exception as ai_err:
+                        print(f"⚠️ Gemini Error: {ai_err}")
+                        return None
+    except Exception as e: 
+        print(f"👁️ Vision Error: {e}")
+    return None    
 
 
 # --- CONFIG & GLOBALS ---
