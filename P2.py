@@ -553,26 +553,31 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
                     
-        # LAYER 2: AI & RECOVERY (Handles servers with NO help bots)
+        # LAYER 2: SNIPER & AI RECOVERY (Optimized for Solo Servers)
         if message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-            # 1. New Spawn Detection
+            # 1. New Spawn Detection (The "First Strike")
             if "wild pokémon has appeared" in low_content and ai_enabled:
-                # Check if we already caught it via Layer 0 or 1
+                # Loophole Check: If Layer 0/1 (Assistant/Pokename) caught it, we stay silent
                 if getattr(alt_client, 'ocr_lock', False): return
                 
-                img = message.embeds[0].image.url if message.embeds else None
+                # Extract the high-res image from the Poketwo embed
+                img = message.embeds.image.url if message.embeds else None
                 if img:
-                    print(f"👁️ [{nickname}] No helper bots detected. Using AI Vision...")
-                    raw_ai = await get_ai_identification(img)
-                    matched = get_best_match(raw_ai)
+                    print(f"👁️ [{nickname}] Solo Spawn! Activating Sniper Vision...")
                     
-                    if matched:
-                        # AI found a name! Catch it.
-                        await catch_action(message, matched)
+                    # This function now performs: 1. Shape Extraction -> 2. wHash Check -> 3. Gemini Fallback
+                    raw_identity = await get_ai_identification(img)
+                    
+                    if raw_identity:
+                        # Plan 1: Apply aggressive fuzzy match to fix "CALARIAN" typos
+                        matched = get_best_match(raw_identity)
+                        if matched:
+                            await catch_action(alt_client, message, matched)
                     else:
-                        # AI failed or isn't sure? Get the hint for 100% accuracy.
+                        # If both Sniper and AI are stumped, call Layer 3 (Hint)
+                        print(f"❓ [{nickname}] Vision failed. Triggering Hint Fallback.")
                         await message.channel.send("<@716390085896962058> h")
             
             # 2. Wrong Guess Recovery
