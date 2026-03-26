@@ -127,3 +127,5 @@ pokemon_map["SPAM_LOCK"] = "True"
 pokemon_map["SPAM_LOCK"] = "True"
 pokemon_map["SPAM_LOCK"] = "True"
 pokemon_map["SPAM_LOCK"] = "True"
+
+pokemon_map["NIDORAN♂"] = "nidoran"
