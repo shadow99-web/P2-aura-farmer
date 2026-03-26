@@ -143,19 +143,32 @@ async def get_ai_identification(image_url):
 
                     # WAVELET HASH: spatially local, ignores additive noise.
                     live_hash = imagehash.whash(normalized)
-                    best_match, min_dist = None, 64 
+                    # --- SEARCH FOR THE BEST MATCH ---
+                    best_match = None
+                    min_dist = 64 # Start with maximum possible distance
                     
                     for h_str, name in HASH_DATABASE.items():
+                        # 1. SKIP non-hex keys like "database_info" to prevent crashes
+                        if not all(c in "0123456789abcdefABCDEF" for c in h_str):
+                            continue
+                            
+                        # 2. Compare hashes
                         dist = live_hash - imagehash.hex_to_hash(h_str)
-                        if dist <= 12: # Tight match
-                            print(f"🎯 [SNIPER] Match: {name} ({dist})")
-                            return name
+                        
+                        # 3. Track the SMALLEST distance found
                         if dist < min_dist:
-                            best_match, min_dist = name, dist
+                            min_dist = dist
+                            best_match = name
+                            
+                        # If it's a perfect match, we can stop early
+                        if dist == 0:
+                            break
                     
-                    if best_match and min_dist <= 22: # Fuzzy match
-                        print(f"🎯 [SNIPER] Fuzzy: {best_match} ({min_dist})")
+                    # 4. Final check: Only return if the best match is within tolerance
+                    if best_match and min_dist <= 18:
+                        print(f"🎯 Best Match: {best_match} (Dist: {min_dist})")
                         return best_match
+
 
                     # --- LAYER 2: GEMINI 1.5 FLASH (The 'Human' Brain) ---
                     print(f"🤖 [SYSTEM] Sniper uncertain ({min_dist}). Calling Gemini...")
