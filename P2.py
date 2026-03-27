@@ -98,7 +98,7 @@ def home():
 def run():
     # Render automatically tells the bot which port to use. 
     # If it's not set, we use 10000 (safe for Render).
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 7860))
     try:
         app.run(host='0.0.0.0', port=port)
     except Exception as e:
