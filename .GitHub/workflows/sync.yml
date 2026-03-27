@@ -12,4 +12,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push -f https://shadow99-web:$HF_TOKEN@huggingface.co/spaces/DiscordBOTNHIHUN/P2AURAFARMER main
+        run: git push -f https://shadow99-web:$HF_TOKEN@huggingface.co/spaces/DiscordBOTNHIHUN/P2ARAFARMER main
