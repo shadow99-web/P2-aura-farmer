@@ -642,7 +642,7 @@ async def main_boot():
     
     # 2. Extract and Clean Tokens
     ACCOUNTS = []
-    for i in range(1, 5):
+    for i in range(1, 3):
         name = f"TOKEN{i}"
         val = os.getenv(name)
         
