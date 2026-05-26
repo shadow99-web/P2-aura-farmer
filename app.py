@@ -197,7 +197,11 @@ TOKEN = os.getenv("TOKEN")
 POKENAME_BOT_ID = 874910942490677270
 POKETWO_ID = 716390085896962058
 SPAM_CHANNEL_ID = 1459841583536148601
-MY_USER_ID = 1378954077462986772
+ADMIN_IDS = [
+    1378954077462986772,  # Your Main ID
+    876746134352183336,
+    1489464610565390336
+]
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "shadow99-web/P2-aura-farmer" 
 FILE_PATH = "corrections.py"
@@ -378,7 +382,7 @@ def setup_events(alt_client, nickname):
         if is_bot_sleeping() and message.author.id != MY_USER_ID: return
             
         # 2. Admin Commands
-        if message.author.id == MY_USER_ID:
+        if message.author.id in ADMIN_IDS:
             content = message.content.strip()
             cmd = content.lower()
             
@@ -527,27 +531,34 @@ def setup_events(alt_client, nickname):
                     success = await update_github_database(wrong, right)
                     await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
-        # 4. CAPTCHA DETECTION with Message Link
+# 4. CAPTCHA DETECTION - Multi-Admin Alerts
         if message.author.id == POKETWO_ID:
             low_msg = message.content.lower()
             if "captcha" in low_msg or "verify" in low_msg:
                 alt_client.captcha_locked = True
                 jump_url = message.jump_url
-                print(f"🚨 CAPTCHA on {nickname}! isolated.")
+                print(f"🚨 CAPTCHA on {nickname}! System isolated.")
                 
-                try:
-                    main_user = await alt_client.fetch_user(MY_USER_ID)
-                    await main_user.send(
-                        f"⚠️ **CAPTCHA ALERT**\nBot: `{nickname}`\n"
-                        f"🔗 **Solve here:** {jump_url}\n"
-                        f"Status: **PAUSED**. Type `.resume` to continue."
-                    )
-                except Exception as e:
-                    print(f"DM Failed: {e}")
+                # LOOP THROUGH ALL ADMINS
+                for admin_id in ADMIN_IDS:
+                    try:
+                        admin_user = await alt_client.fetch_user(admin_id)
+                        await admin_user.send(
+                            f"⚠️ **CAPTCHA ALERT**\n"
+                            f"Bot: `{nickname}`\n"
+                            f"🔗 **Solve here:** {jump_url}\n"
+                            f"Status: **PAUSED**. Type `.resume` to continue."
+                        )
+                        print(f"✅ DM Alert sent to Admin: {admin_id}")
+                    except Exception as e:
+                        # This ensures if one admin has DMs off, the others still get the message
+                        print(f"❌ Could not DM Admin {admin_id}: {e}")
                 return
+
 
         # 5. The Individual Gatekeeper (Kill-switch)
         if alt_client.captcha_locked: return
+
 
         # --- CATCHING LAYERS ---
         
