@@ -381,8 +381,12 @@ def setup_events(alt_client, nickname):
         # 1. Sleep Logic
         if is_bot_sleeping() and message.author.id != MY_USER_ID: return
             
-        # 2. Admin Commands
-        if message.author.id in ADMIN_IDS:
+        # 1. Sleep Logic
+        if is_bot_sleeping() and message.author.id != MY_USER_ID: return
+            
+        # 2. Admin & Self-Account Commands Override
+        # 🔥 FIX: Allows the bot's own account (e.g., Akagami) OR global admins to issue control words
+        if message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id:
             content = message.content.strip()
             cmd = content.lower()
             
@@ -393,7 +397,7 @@ def setup_events(alt_client, nickname):
                        
             elif content == ".resume":
                 alt_client.captcha_locked = False
-                await message.channel.send(f"✅ **{nickname}** is back in action!")
+                await message.channel.send(f"✅ **{nickname}** restriction cleared! Target unlocked.")
                 return
             
             elif content == ".resumeall":
@@ -537,10 +541,15 @@ def setup_events(alt_client, nickname):
             if "captcha" in low_msg or "verify" in low_msg:
                 alt_client.captcha_locked = True
                 jump_url = message.jump_url
-                print(f"🚨 CAPTCHA on {nickname}! System isolated.")
+                print(f"🚨 CAPTCHA on {nickname}! System isolated.", flush=True)
                 
                 # LOOP THROUGH ALL ADMINS
                 for admin_id in ADMIN_IDS:
+                    # 🔥 CRITICAL FIX: Skip if the bot is trying to DM its own user profile ID
+                    if admin_id == alt_client.user.id:
+                        print(f"ℹ️ Skipping self-DM alert for {nickname} (Self-managed Account).", flush=True)
+                        continue
+                        
                     try:
                         admin_user = await alt_client.fetch_user(admin_id)
                         await admin_user.send(
@@ -549,10 +558,9 @@ def setup_events(alt_client, nickname):
                             f"🔗 **Solve here:** {jump_url}\n"
                             f"Status: **PAUSED**. Type `.resume` to continue."
                         )
-                        print(f"✅ DM Alert sent to Admin: {admin_id}")
+                        print(f"✅ DM Alert sent to Admin: {admin_id}", flush=True)
                     except Exception as e:
-                        # This ensures if one admin has DMs off, the others still get the message
-                        print(f"❌ Could not DM Admin {admin_id}: {e}")
+                        print(f"❌ Could not DM Admin {admin_id}: {e}", flush=True)
                 return
 
 
