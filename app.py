@@ -8,31 +8,43 @@ import os
 import ssl
 import re
 from corrections import pokemon_map, SLEEP_START_HOUR, SLEEP_END_HOUR
-from google import genai
-from google.genai import types
 from datetime import datetime
 import pytz 
 from flask import Flask
 from threading import Thread
 import difflib
 import sys 
-import imagehash 
-from PIL import Image, ImageFilter, ImageOps
 from io import BytesIO
 import json 
 import unicodedata
 
 # --- SNIPER DATABASE LOADER ---
-HASH_DATABASE = {}
-try:
-    # Render automatically pulls your p2_master_hashes.json from GitHub
-    with open("p2_master_hashes.json", "r") as f:
-        HASH_DATABASE = json.load(f)
-    print(f"✅ [SNIPER] Database Loaded: {len(HASH_DATABASE)} fingerprints active.", flush=True)
-except Exception as e:
-    print(f"⚠️ [SNIPER] Database load failed: {e}. Bot will use Gemini only.", flush=True)
+# --- 🔥 FAST PLATFORM ENDPOINT: PRIVATE ONNX MICROSERVICE ---
+async def query_private_onnx_api(image_url):
+    """Queries your high-speed AI space running on Hugging Face."""
+    # Lowercase username format routes smoothly through Hugging Face public edge balancers
+    api_url = "https://discordbotnhihun-poketwo.hf.space/predict"
     
-
+    headers = {
+        "x-license-key": "sujaliscool",  # Passes your FastAPI Header verification check
+        "Content-Type": "application/json"
+    }
+    payload = {"imageUrl": image_url}
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(api_url, headers=headers, json=payload, timeout=4.0) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("status"):
+                        print(f"🧠 [ONNX AI] Model Guess: {data['name']} (Conf: {data['confidence']})", flush=True)
+                        return data["name"]
+                elif resp.status == 401:
+                    print("❌ [ONNX AI] Auth Failure! Check VALID_API_KEY inside your app.py", flush=True)
+        except Exception as e:
+            print(f"⚠️ [ONNX AI] Cloud routing delay: {e}", flush=True)
+    return None
+    
 # --- CRITICAL FIX FOR 'NoneType' object is not iterable ---
 from discord.state import ConnectionState
 
@@ -107,89 +119,6 @@ def run():
 def keep_alive():
     t = Thread(target=run, daemon=True) # daemon=True ensures it dies when main script dies
     t.start()
-
-
-# --- MODERN AI CONFIG (Using your preferred prompt) ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# Using the new Client structure
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-# --- THE "LENS-POWERED" SNIPER ---
-async def get_ai_identification(image_url):
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(image_url) as resp:
-                if resp.status == 200:
-                    img_data = await resp.read()
-                    img = Image.open(BytesIO(img_data)).convert("RGBA")
-                    
-                    # --- NOISE REDUCTION ---
-                    # We slightly blur to smooth out the 'Sharpness' anti-cheat 
-                    # that creates the 'tail difference' you saw.
-                    img = img.filter(ImageFilter.GaussianBlur(radius=0.3))
-                    
-                    # --- ALPHA BOUNDING BOX (The Background Killer) ---
-                    alpha = img.getchannel('A')
-                    bbox = alpha.getbbox() 
-                    if bbox:
-                        # We CROP the forest away. This is how we beat the 20% data loss.
-                        img_only = img.crop(bbox)
-                        # We place the Pokemon on the SAME Neutral Gray baseline
-                        bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
-                        normalized = Image.alpha_composite(bg, img_only).convert("L")
-                        normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
-                    else:
-                        normalized = img.convert("L").resize((128, 128))
-
-                    # WAVELET HASH: spatially local, ignores additive noise.
-                    live_hash = imagehash.whash(normalized)
-                    # --- SEARCH FOR THE BEST MATCH ---
-                    best_match = None
-                    min_dist = 64 # Start with maximum possible distance
-                    
-                    for h_str, name in HASH_DATABASE.items():
-                        # 1. SKIP non-hex keys like "database_info" to prevent crashes
-                        if not all(c in "0123456789abcdefABCDEF" for c in h_str):
-                            continue
-                            
-                        # 2. Compare hashes
-                        dist = live_hash - imagehash.hex_to_hash(h_str)
-                        
-                        # 3. Track the SMALLEST distance found
-                        if dist < min_dist:
-                            min_dist = dist
-                            best_match = name
-                            
-                        # If it's a perfect match, we can stop early
-                        if dist == 0:
-                            break
-                    
-                    # 4. Final check: Only return if the best match is within tolerance
-                    if best_match and min_dist <= 18:
-                        print(f"🎯 Best Match: {best_match} (Dist: {min_dist})")
-                        return best_match
-
-
-                    # --- LAYER 2: GEMINI 1.5 FLASH (The 'Human' Brain) ---
-                    print(f"🤖 [SYSTEM] Sniper uncertain ({min_dist}). Calling Gemini...")
-                    try:
-                        # FIXED SYNTAX: Properly formatted contents list
-                        response = client.models.generate_content(
-                            model="gemini-1.5-flash",
-                            contents=[
-                                "Identify this Pokemon. Return ONLY the name.",
-                                types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
-                            ]
-                        )
-                        # Normalize to Latin to beat Homograph attacks
-                        raw_name = response.text.strip().split()[0].upper()
-                        return unicodedata.normalize('NFKC', "".join(c for c in raw_name if c.isalpha()))
-                    except Exception as ai_err:
-                        print(f"⚠️ Gemini Error: {ai_err}")
-                        return None
-    except Exception as e: 
-        print(f"👁️ Vision Error: {e}")
-    return None    
 
 
 # --- CONFIG & GLOBALS ---
@@ -383,8 +312,6 @@ def setup_events(alt_client, nickname):
             if not message.content.strip().startswith("."):
                 return  # Safely ignore its own regular spam/messages to prevent loop loops
 
-        # 1. Sleep Logic
-        if is_bot_sleeping() and message.author.id != MY_USER_ID: return
             
         # 1. Sleep Logic
         if is_bot_sleeping() and message.author.id != MY_USER_ID: return
@@ -415,102 +342,7 @@ def setup_events(alt_client, nickname):
                 await set_spam_lock_github("False")
                 await message.channel.send(f"✅ **{nickname} Spammer Resumed.**")
             elif cmd == ".ping": 
-                await message.channel.send(f"🏓 `{nickname}` Pong! `{round(alt_client.latency * 1000)}ms`")
-            
-            
-            elif cmd.startswith(".test "):
-                # Usage: .test [image_url]
-                test_url = content[6:].strip()
-                if not test_url:
-                    await message.channel.send("❌ **Please provide an image URL to test!**")
-                    return
-                
-                await message.channel.send("🔍 **Testing Sniper Vision...**")
-                
-                # This triggers the EXACT same logic the bot uses for real spawns
-                start_time = asyncio.get_event_loop().time()
-                result = await get_ai_identification(test_url)
-                end_time = asyncio.get_event_loop().time()
-                
-                duration = round(end_time - start_time, 2)
-                
-                if result:
-                    await message.channel.send(
-                        f"✅ **Result:** `{result}`\n"
-                        f"⏱️ **Time taken:** `{duration}s`"
-                    )
-                else:
-                    await message.channel.send("😔 **Sniper & Gemini both failed to identify this.**")
-          
-              
-            elif cmd.startswith(".save "):
-                # Usage: Reply to a spawn with ".save Pikachu"
-                target_name = content[6:].strip().upper()
-                if not message.reference:
-                    await message.channel.send("❌ Reply to a spawn first!")
-                    return
-
-                replied_msg = await message.channel.fetch_message(message.reference.message_id)
-                
-                # FIX: Check both Image and Thumbnail so training never fails
-                img_url = None
-                if replied_msg.embeds:
-                    embed = replied_msg.embeds[0]
-                    img_url = embed.image.url if embed.image else (embed.thumbnail.url if embed.thumbnail else None)
-                
-                if not img_url:
-                    await message.channel.send("❌ No image found in that message!")
-                    return
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(img_url) as resp:
-                        if resp.status == 200:
-                            img_data = await resp.read()
-                            img = Image.open(BytesIO(img_data)).convert("RGBA")
-                            
-                            # Standardized Alpha-Masking (Matches the Sniper Logic)
-                            alpha = img.getchannel('A')
-                            bbox = alpha.getbbox()
-                            if bbox:
-                                img_only = img.crop(bbox)
-                                bg = Image.new("RGBA", img_only.size, (128, 128, 128, 255))
-                                normalized = Image.alpha_composite(bg, img_only).convert("L")
-                                normalized = normalized.resize((128, 128), Image.Resampling.LANCZOS)
-                            else:
-                                normalized = img.convert("L").resize((128, 128))
-
-                            new_hash = str(imagehash.whash(normalized))
-                            
-                            # GITHUB AUTO-SYNC
-                            repo_url = f"https://api.github.com/repos/{REPO_NAME}/contents/p2_master_hashes.json"
-                            headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-                            
-                            try:
-                                g_resp = requests.get(repo_url, headers=headers)
-                                if g_resp.status_code == 200:
-                                    g_data = g_resp.json()
-                                    current_json = json.loads(base64.b64decode(g_data['content']).decode('utf-8'))
-                                    
-                                    # Update Database
-                                    current_json[new_hash] = target_name
-                                    HASH_DATABASE[new_hash] = target_name 
-                                    
-                                    updated_content = json.dumps(current_json, indent=4)
-                                    payload = {
-                                        "message": f"Auto-Learn: {target_name}",
-                                        "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
-                                        "sha": g_data['sha']
-                                    } # Fixed the missing brace here
-                                    
-                                    put_r = requests.put(repo_url, headers=headers, json=payload)
-                                    
-                                    if put_r.status_code in [200, 201]:
-                                        await message.channel.send(f"✅ **Learned {target_name}!**\nHash: `{new_hash}`")
-                                    else:
-                                        await message.channel.send(f"⚠️ GitHub Sync Error: {put_r.status_code}")
-                            except Exception as e:
-                                await message.channel.send(f"❌ Sync Failed: {e}")
-                                
+                await message.channel.send(f"🏓 `{nickname}` Pong! `{round(alt_client.latency * 1000)}ms`")         
                                 
             elif cmd == ".check":
                 await message.channel.send("<@716390085896962058> bal")
@@ -598,38 +430,26 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
                     
-        # LAYER 2: SNIPER & AI RECOVERY (Optimized for Solo Servers)
+        # LAYER 2: Target Spawns (Solo Channel Handling via your Public ONNX API)
         if message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-            # 1. New Spawn Detection (The "First Strike")
             if "wild pokémon has appeared" in low_content and ai_enabled:
-                # Loophole Check: If Layer 0/1 (Assistant/Pokename) caught it, we stay silent
                 if getattr(alt_client, 'ocr_lock', False): return
                 
-                # Extract the high-res image from the Poketwo embed
-                img = message.embeds.image.url if message.embeds else None
+                img = message.embeds[0].image.url if message.embeds else None
                 if img:
-                    print(f"👁️ [{nickname}] Solo Spawn! Activating Sniper Vision...")
+                    print(f"👁️ [{nickname}] Solo Spawn! Routing to your ONNX API...", flush=True)
                     
-                    # This function now performs: 1. Shape Extraction -> 2. wHash Check -> 3. Gemini Fallback
-                    raw_identity = await get_ai_identification(img)
+                    raw_identity = await query_private_onnx_api(img)
                     
                     if raw_identity:
-                        # Plan 1: Apply aggressive fuzzy match to fix "CALARIAN" typos
                         matched = get_best_match(raw_identity)
                         if matched:
-                            await catch_action(alt_client, message, matched)
+                            await catch_action(message, matched)
                     else:
-                        # If both Sniper and AI are stumped, call Layer 3 (Hint)
-                        print(f"❓ [{nickname}] Vision failed. Triggering Hint Fallback.")
+                        print(f"⏩ [{nickname}] ONNX model missed. Activating Layer 3 Hint.")
                         await message.channel.send("<@716390085896962058> h")
-            
-            # 2. Wrong Guess Recovery
-            elif "that is the wrong pokémon" in low_content:
-                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
-                await asyncio.sleep(1.0)
-                await message.channel.send("<@716390085896962058> h")
 
             # 3. Hint Solver (The Final Safety Net)
             elif "the pokémon is" in low_content:
@@ -639,9 +459,7 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, solved)
 
 
-
-
-# --- MODERN BOOT LOGIC ---
+# --- MODERN BOOT LOGIC --
 async def safe_start(client, token, nickname):
     """Aggressive login with a hard 30-second timeout."""
     try:
@@ -708,8 +526,6 @@ async def main_boot():
 
     while True:
         await asyncio.sleep(3600)
-
-
 
 if __name__ == "__main__":
     try:
