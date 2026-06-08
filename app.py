@@ -431,21 +431,17 @@ def setup_events(alt_client, nickname):
                     return
                     
         # ─── LAYER 2: CORE TARGET SPAWNS & HINTS ───
-        # If neither Layer 0 nor Layer 1 matched, see if the author is Pokétwo itself
         elif message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-            # Action A: New Wild Spawn Ingress
+            # --- Condition 1: New Wild Spawn ---
             if "wild pokémon has appeared" in low_content and ai_enabled:
                 if getattr(alt_client, 'ocr_lock', False): 
                     return
                 
                 img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
-
                 if img:
-                    print(f"👁️ [{nickname}] Solo Spawn! Routing to your ONNX API...", flush=True)
-                    
-                    # Call your high-speed Hugging Face Space endpoint
+                    print(f"👁️ [{nickname}] Solo Spawn! Routing...", flush=True)
                     raw_identity = await query_private_onnx_api(img)
                     
                     if raw_identity:
@@ -456,18 +452,19 @@ def setup_events(alt_client, nickname):
                         print(f"⏩ [{nickname}] ONNX model missed. Activating Layer 3 Hint.")
                         await message.channel.send("<@716390085896962058> h")
 
-                        # 2. Wrong Guess Recovery
+            # --- 🔥 FIXED: Condition 2 (Aligned with Condition 1) ---
             elif "that is the wrong pokémon" in low_content:
                 print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
                 await asyncio.sleep(1.0)
                 await message.channel.send("<@716390085896962058> h")
 
-            # 3. Hint Solver (The Final Safety Net)
+            # --- 🔥 FIXED: Condition 3 (Aligned with Condition 1) ---
             elif "the pokémon is" in low_content:
                 solved = solve_hint(message.content.split("is ")[1])
                 if solved:
                     print(f"💡 [{nickname}] Hint Solved: {solved}")
                     await catch_action(message, solved)
+
 
 # --- MODERN BOOT LOGIC --
 async def safe_start(client, token, nickname):
