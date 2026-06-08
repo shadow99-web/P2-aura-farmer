@@ -306,18 +306,17 @@ def setup_events(alt_client, nickname):
         global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
         # --- 🔥 CRITICAL PATCH: SELF-RECOGNITION ENTRY GATE ---
-        # Instead of completely ignoring the bot's own ID up front, we only let it pass 
-        # if the message starts with your prefix character '.'
-        if message.author.id == alt_client.user.id:
+        is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
             if not message.content.strip().startswith("."):
                 return  # Safely ignore its own regular spam/messages to prevent loop loops
 
             
         # 1. Sleep Logic
-        if is_bot_sleeping() and message.author.id != MY_USER_ID: return
+        if is_bot_sleeping() and not is_admin_or_self: 
+            return
+
             
         # 2. Admin & Self-Account Commands Override
-        # 🔥 FIX: Allows the bot's own account (e.g., Akagami) OR global admins to issue control words
         if message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id:
             content = message.content.strip()
             cmd = content.lower()
