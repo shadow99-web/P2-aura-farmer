@@ -305,19 +305,20 @@ def setup_events(alt_client, nickname):
             
         global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
-        # --- 🔥 CRITICAL PATCH: SELF-RECOGNITION ENTRY GATE ---
+        # --- 🔥 CRITICAL PATCH: SELF-RECOGNITION ENTRY GATE (FIXED ALIGNMENT) ---
         is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
+        
+        if message.author.id == alt_client.user.id:
             if not message.content.strip().startswith("."):
                 return  # Safely ignore its own regular spam/messages to prevent loop loops
 
-            
         # 1. Sleep Logic
         if is_bot_sleeping() and not is_admin_or_self: 
             return
-
             
         # 2. Admin & Self-Account Commands Override
         if message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id:
+
             content = message.content.strip()
             cmd = content.lower()
             
