@@ -436,33 +436,27 @@ def setup_events(alt_client, nickname):
         elif message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-            # --- Condition 1: New Wild Spawn ---
-            if "wild pokémon has appeared" in low_content and ai_enabled:
-                if getattr(alt_client, 'ocr_lock', False): 
-                    return
-                
-                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
-                if img:
-                    print(f"👁️ [{nickname}] Solo Spawn! Routing to decoupled client...", flush=True)
-                    
-                    # 1. CALL your new api_client.py function instead of the old function
-                    api_response = await predict_pokemon(img)
-                    
-                    # 2. CHECK if the response dictionary exists and has a successful status
-                    if api_response and api_response.get("status") is True:
-                        
-                        # 3. EXTRACTION: Safely isolate just the text string name from the dictionary
-                        raw_identity = api_response.get("name")
-                        
-                        # 4. PROCESS the clean string name down through your text matching tool
-                        matched = get_best_match(raw_identity)
-                        if matched:
-                            await catch_action(message, matched)
-                            
-                    # 5. FALLBACK: If the API is offline, fails validation, or times out (returns None)
-                    else:
-                        print(f"⏩ [{nickname}] ONNX client missed or timed out. Activating Layer 3 Hint Solver.")
-                        await message.channel.send("<@716390085896962058> h")
+# --- Condition 1: New Wild Spawn ---
+if "wild pokémon has appeared" in low_content and ai_enabled:
+    if getattr(alt_client, 'ocr_lock', False): 
+        return
+    
+    img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
+    if img:
+        print(f"👁️ [{nickname}] Solo Spawn! Calling Hugging Face API...", flush=True)
+        
+        # Use your existing query_private_onnx_api function (it already works!)
+        pokemon_name = await query_private_onnx_api(img)
+        
+        if pokemon_name:
+            # Apply any manual corrections from pokemon_map
+            if pokemon_name.upper() in pokemon_map:
+                pokemon_name = pokemon_map[pokemon_name.upper()]
+            
+            await catch_action(message, pokemon_name)
+        else:
+            print(f"⏩ [{nickname}] HF API failed. Falling back to hint...")
+            await message.channel.send("<@716390085896962058> h")
 
 
             # --- 🔥 FIXED: Condition 2 (Aligned with Condition 1) ---
