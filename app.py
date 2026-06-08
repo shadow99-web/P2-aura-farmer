@@ -403,11 +403,10 @@ def setup_events(alt_client, nickname):
 
         # 5. The Individual Gatekeeper (Kill-switch)
         if alt_client.captcha_locked: return
-
-
-        # --- CATCHING LAYERS ---
-        
-        # LAYER 0: Assistant (Check if Assistant Bots are present)
+    # ========================================================
+        #       🔥 CATCHING LAYERS PIPELINE 🔥
+    # ========================================================    
+        # ─── LAYER 0: ASSISTANT BOT MONITORING ───
         if message.author.id in [854233015475109888, 1459494731775217860]:
             matched = get_best_match(message.content)
             if matched:
@@ -417,8 +416,9 @@ def setup_events(alt_client, nickname):
                 alt_client.ocr_lock = False
                 return
 
-        # LAYER 1: OCR (Check if Pokename Bot is present)
-        if message.author.id == POKENAME_BOT_ID:
+        # ─── LAYER 1: POKENAME BOT OCR MONITORING ───
+        # If Layer 0 didn't match, check if it's the specific naming bot ID
+        elif message.author.id == POKENAME_BOT_ID:
             if getattr(alt_client, 'ocr_lock', False):
                 print(f"⏩ [{nickname}] Assistant handled it. Skipping OCR.")
                 return
@@ -430,17 +430,21 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
                     
-        # LAYER 2: Target Spawns (Solo Channel Handling via your Public ONNX API)
-        if message.author.id == POKETWO_ID:
+        # ─── LAYER 2: CORE TARGET SPAWNS & HINTS ───
+        # If neither Layer 0 nor Layer 1 matched, see if the author is Pokétwo itself
+        elif message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
+            # Action A: New Wild Spawn Ingress
             if "wild pokémon has appeared" in low_content and ai_enabled:
-                if getattr(alt_client, 'ocr_lock', False): return
+                if getattr(alt_client, 'ocr_lock', False): 
+                    return
                 
                 img = message.embeds[0].image.url if message.embeds else None
                 if img:
                     print(f"👁️ [{nickname}] Solo Spawn! Routing to your ONNX API...", flush=True)
                     
+                    # Call your high-speed Hugging Face Space endpoint
                     raw_identity = await query_private_onnx_api(img)
                     
                     if raw_identity:
@@ -457,7 +461,6 @@ def setup_events(alt_client, nickname):
                 if solved:
                     print(f"💡 [{nickname}] Hint Solved: {solved}")
                     await catch_action(message, solved)
-
 
 # --- MODERN BOOT LOGIC --
 async def safe_start(client, token, nickname):
