@@ -26,7 +26,7 @@ async def query_private_onnx_api(image_url):
     api_url = "https://discordbotnhihun-poketwo.hf.space/predict"
     
     headers = {
-        "x-license-key": "sujaliscool",  # Passes your FastAPI Header verification check
+        "x-license-key": "jeetendraiscool",  # Passes your FastAPI Header verification check
         "Content-Type": "application/json"
     }
     payload = {"imageUrl": image_url}
