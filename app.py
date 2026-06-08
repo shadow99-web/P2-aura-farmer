@@ -299,6 +299,9 @@ def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_message(message):
         # 1. Initialize individual lock status
+          
+        print(f"📨 [DEBUG] Author: {message.author.id} | Content: {message.content[:50]} | Channel: {message.channel.name}")
+       
         if not hasattr(alt_client, 'captcha_locked'):
             alt_client.captcha_locked = False
         if not hasattr(alt_client, 'ocr_lock'):
