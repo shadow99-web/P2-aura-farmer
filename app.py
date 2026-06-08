@@ -18,7 +18,6 @@ from io import BytesIO
 import json 
 import unicodedata
 from config import ACCOUNTS
-from api_client import predict_pokemon
 
 # --- SNIPER DATABASE LOADER ---
 # --- 🔥 FAST PLATFORM ENDPOINT: PRIVATE ONNX MICROSERVICE ---
@@ -432,31 +431,35 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
                     
-        # ─── LAYER 2: CORE TARGET SPAWNS & HINTS ───
+        # ─── PRIMARY GATEWAY ───
+        # This block is indented 8 spaces (2 standard tabs) from the far-left wall
         elif message.author.id == POKETWO_ID:
             low_content = message.content.lower()
             
-# --- Condition 1: New Wild Spawn ---
-if "wild pokémon has appeared" in low_content and ai_enabled:
-    if getattr(alt_client, 'ocr_lock', False): 
-        return
-    
-    img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
-    if img:
-        print(f"👁️ [{nickname}] Solo Spawn! Calling Hugging Face API...", flush=True)
-        
-        # Use your existing query_private_onnx_api function (it already works!)
-        pokemon_name = await query_private_onnx_api(img)
-        
-        if pokemon_name:
-            # Apply any manual corrections from pokemon_map
-            if pokemon_name.upper() in pokemon_map:
-                pokemon_name = pokemon_map[pokemon_name.upper()]
-            
-            await catch_action(message, pokemon_name)
-        else:
-            print(f"⏩ [{nickname}] HF API failed. Falling back to hint...")
-            await message.channel.send("<@716390085896962058> h")
+            # --- CONDITION A (SHIFTED RIGHT 12 SPACES) ---
+            # This sits exactly 4 spaces deeper than its parent 'elif' statement
+            if "wild pokémon has appeared" in low_content and ai_enabled:
+                if getattr(alt_client, 'ocr_lock', False): 
+                    return
+                
+                # --- NESTED EXECUTION LOGIC (SHIFTED RIGHT 16 SPACES) ---
+                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
+                if img:
+                    print(f"👁️ [{nickname}] Active Target Spawn! Processing network request...", flush=True)
+                    
+                    # Await your background service function execution call
+                    pokemon_name = await query_private_onnx_api(img)
+                    
+                    # --- CORE RESPONSE PROCESSING (SHIFTED RIGHT 20 SPACES) ---
+                    if pokemon_name:
+                        if pokemon_name.upper() in pokemon_map:
+                            pokemon_name = pokemon_map[pokemon_name.upper()]
+                        
+                        await catch_action(message, pokemon_name)
+                    else:
+                        print(f"⏩ [{nickname}] Network routing missed. Shifting to backup layer...")
+                        await message.channel.send("<@716390085896962058> h")
+
 
 
             # --- 🔥 FIXED: Condition 2 (Aligned with Condition 1) ---
