@@ -1,6 +1,7 @@
 import logging
 import aiohttp
-from utils.config import PREDICT_API_URL, PREDICT_API_KEY, PREDICT_TIMEOUT_SECONDS
+# Open your api_client.py and ensure line 3 looks locally like this:
+from config import PREDICT_API_URL, PREDICT_API_KEY, PREDICT_TIMEOUT_SECONDS
 
 logger = logging.getLogger("namebot.api")
 
