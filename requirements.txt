@@ -1,8 +1,5 @@
 discord.py-self==2.0.0
 aiohttp
-google-genai
 requests
 pytz
 flask
-Pillow
-imagehash
