@@ -24,7 +24,7 @@ from config import ACCOUNTS
 async def query_private_onnx_api(image_url):
     """Queries your high-speed AI space running on Hugging Face."""
     # Lowercase username format routes smoothly through Hugging Face public edge balancers
-    api_url = "https://discordbotnhihun-poketwo.hf.space/predict"
+    api_url = "https://discordbotnhihun-poketwo.hf.space"
     
     headers = {
         "x-license-key": "jeetendraiscool",  # Passes your FastAPI Header verification check
@@ -299,9 +299,7 @@ def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_message(message):
         # 1. Initialize individual lock status
-          
-        print(f"📨 [DEBUG] Author: {message.author.id} | Content: {message.content[:50]} | Channel: {message.channel.name}")
-       
+        
         if not hasattr(alt_client, 'captcha_locked'):
             alt_client.captcha_locked = False
         if not hasattr(alt_client, 'ocr_lock'):
