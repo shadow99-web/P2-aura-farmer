@@ -17,6 +17,8 @@ import sys
 from io import BytesIO
 import json 
 import unicodedata
+from config import ACCOUNTS
+from api_client import predict_pokemon
 
 # --- SNIPER DATABASE LOADER ---
 # --- 🔥 FAST PLATFORM ENDPOINT: PRIVATE ONNX MICROSERVICE ---
@@ -441,16 +443,27 @@ def setup_events(alt_client, nickname):
                 
                 img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
                 if img:
-                    print(f"👁️ [{nickname}] Solo Spawn! Routing...", flush=True)
-                    raw_identity = await query_private_onnx_api(img)
+                    print(f"👁️ [{nickname}] Solo Spawn! Routing to decoupled client...", flush=True)
                     
-                    if raw_identity:
+                    # 1. CALL your new api_client.py function instead of the old function
+                    api_response = await predict_pokemon(img)
+                    
+                    # 2. CHECK if the response dictionary exists and has a successful status
+                    if api_response and api_response.get("status") is True:
+                        
+                        # 3. EXTRACTION: Safely isolate just the text string name from the dictionary
+                        raw_identity = api_response.get("name")
+                        
+                        # 4. PROCESS the clean string name down through your text matching tool
                         matched = get_best_match(raw_identity)
                         if matched:
                             await catch_action(message, matched)
+                            
+                    # 5. FALLBACK: If the API is offline, fails validation, or times out (returns None)
                     else:
-                        print(f"⏩ [{nickname}] ONNX model missed. Activating Layer 3 Hint.")
+                        print(f"⏩ [{nickname}] ONNX client missed or timed out. Activating Layer 3 Hint Solver.")
                         await message.channel.send("<@716390085896962058> h")
+
 
             # --- 🔥 FIXED: Condition 2 (Aligned with Condition 1) ---
             elif "that is the wrong pokémon" in low_content:
