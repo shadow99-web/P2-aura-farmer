@@ -456,6 +456,12 @@ def setup_events(alt_client, nickname):
                         print(f"⏩ [{nickname}] ONNX model missed. Activating Layer 3 Hint.")
                         await message.channel.send("<@716390085896962058> h")
 
+                        # 2. Wrong Guess Recovery
+            elif "that is the wrong pokémon" in low_content:
+                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
+                await asyncio.sleep(1.0)
+                await message.channel.send("<@716390085896962058> h")
+
             # 3. Hint Solver (The Final Safety Net)
             elif "the pokémon is" in low_content:
                 solved = solve_hint(message.content.split("is ")[1])
