@@ -440,7 +440,8 @@ def setup_events(alt_client, nickname):
                 if getattr(alt_client, 'ocr_lock', False): 
                     return
                 
-                img = message.embeds[0].image.url if message.embeds else None
+                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
+
                 if img:
                     print(f"👁️ [{nickname}] Solo Spawn! Routing to your ONNX API...", flush=True)
                     
