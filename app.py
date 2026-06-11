@@ -472,7 +472,7 @@ def setup_events(alt_client, nickname):
                 if getattr(alt_client, 'mention_only_mode', False):
                     if not (message.mentions and alt_client.user in message.mentions):
                         print(f"ℹ️ [{nickname}] Mention-only mode is active, but the bot was not mentioned. Skipping spawn.")
-                              return
+                        return
                               
                 if getattr(alt_client, 'ocr_lock', False): 
                     return
