@@ -306,6 +306,14 @@ def setup_events(alt_client, nickname):
             alt_client.ocr_lock = False
         if not hasattr(alt_client, 'mention_only_mode'):
             alt_client.mention_only_mode = False
+
+        # --- BLOCK HINTS IN MENTION MODE ---
+    if getattr(alt_client, 'mention_only_mode', False):
+    # If this is a hint-related message from Pokétwo, ignore it completely
+        low = message.content.lower()
+        if "that is the wrong pokémon" in low or "the pokémon is" in low:
+            print(f"🔇 [{nickname}] Hint ignored because mention mode is active.")
+            return
             
         global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
