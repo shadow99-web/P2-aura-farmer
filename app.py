@@ -299,11 +299,13 @@ def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_message(message):
         # 1. Initialize individual lock status
-        
+
         if not hasattr(alt_client, 'captcha_locked'):
             alt_client.captcha_locked = False
         if not hasattr(alt_client, 'ocr_lock'):
             alt_client.ocr_lock = False
+        if not hasattr(alt_client, 'mention_only_mode'):
+            alt_client.mention_only_mode = False
             
         global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
@@ -333,6 +335,20 @@ def setup_events(alt_client, nickname):
                 alt_client.captcha_locked = False
                 await message.channel.send(f"✅ **{nickname}** restriction cleared! Target unlocked.")
                 return
+
+            elif cmd == ".mention":
+                if not getattr(alt_client, 'mention_only_mode', False):
+                    alt_client.mention_only_mode = True
+                    await message.channel.send(f"🔇 **{nickname}** is now in **mention-only mode**. It will only catch Pokémon when mentioned in a spawn message.")
+                else:
+                    await message.channel.send(f"ℹ️ **{nickname}** is already in mention-only mode.")
+    
+            elif cmd == ".unmention":
+                if getattr(alt_client, 'mention_only_mode', False):
+                    alt_client.mention_only_mode = False
+                    await message.channel.send(f"🔊 **{nickname}** is now back to **normal mode**. It will catch all Pokémon spawns.")
+                else:
+                    await message.channel.send(f"ℹ️ **{nickname}** is already in normal mode.")
             
             elif content == ".resumeall":
                 alt_client.captcha_locked = False
@@ -412,6 +428,12 @@ def setup_events(alt_client, nickname):
         if message.author.id in [854233015475109888, 1459494731775217860]:
             matched = get_best_match(message.content)
             if matched:
+                # --- Mention Mode Check ---
+                if getattr(alt_client, 'mention_only_mode', False):
+                    if not (message.mentions and alt_client.user in message.mentions):
+                        print(f"ℹ️ [{nickname}] Mention-only mode is active, but the bot was not mentioned. Skipping spawn.")
+                        return
+                        
                 alt_client.ocr_lock = True 
                 await catch_action(message, matched)
                 await asyncio.sleep(10)
@@ -421,6 +443,12 @@ def setup_events(alt_client, nickname):
         # ─── LAYER 1: POKENAME BOT OCR MONITORING ───
         # If Layer 0 didn't match, check if it's the specific naming bot ID
         elif message.author.id == POKENAME_BOT_ID:
+            # --- Mention Mode Check ---
+            if getattr(alt_client, 'mention_only_mode', False):
+                if not (message.mentions and alt_client.user in message.mentions):
+                    print(f"ℹ️ [{nickname}] Mention-only mode is active, but the bot was not mentioned. Skipping spawn.")
+                    return
+           
             if getattr(alt_client, 'ocr_lock', False):
                 print(f"⏩ [{nickname}] Assistant handled it. Skipping OCR.")
                 return
@@ -440,6 +468,12 @@ def setup_events(alt_client, nickname):
             # --- CONDITION A (SHIFTED RIGHT 12 SPACES) ---
             # This sits exactly 4 spaces deeper than its parent 'elif' statement
             if "wild pokémon has appeared" in low_content and ai_enabled:
+                # --- Mention Mode Check ---
+                if getattr(alt_client, 'mention_only_mode', False):
+                    if not (message.mentions and alt_client.user in message.mentions):
+                        print(f"ℹ️ [{nickname}] Mention-only mode is active, but the bot was not mentioned. Skipping spawn."
+                              return
+                              
                 if getattr(alt_client, 'ocr_lock', False): 
                     return
                 
