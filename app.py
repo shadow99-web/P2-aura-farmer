@@ -499,16 +499,24 @@ def setup_events(alt_client, nickname):
 
             # --- 🔥 FIXED: Condition 2 (Aligned with Condition 1) ---
             elif "that is the wrong pokémon" in low_content:
-                print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
-                await asyncio.sleep(1.0)
-                await message.channel.send("<@716390085896962058> h")
+                    # Only send hint if mention-only mode is NOT active
+                if not getattr(alt_client, 'mention_only_mode', False):
+                    print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
+                    await asyncio.sleep(1.0)
+                    await message.channel.send("<@716390085896962058> h")
+                else:
+                    print(f"🔇 [{nickname}] Wrong guess, but mention mode active – skipping hint.")
 
             # --- 🔥 FIXED: Condition 3 (Aligned with Condition 1) ---
             elif "the pokémon is" in low_content:
-                solved = solve_hint(message.content.split("is ")[1])
-                if solved:
-                    print(f"💡 [{nickname}] Hint Solved: {solved}")
-                    await catch_action(message, solved)
+                if not getattr(alt_client, 'mention_only_mode', False):
+                    solved = solve_hint(message.content.split("is ")[1])
+                    if solved:
+                        print(f"💡 [{nickname}] Hint Solved: {solved}")
+                        await catch_action(message, solved)
+                else:
+                    print(f"🔇 [{nickname}] Hint received but mention mode active – skipping.")
+                    
 
 
 # --- MODERN BOOT LOGIC --
