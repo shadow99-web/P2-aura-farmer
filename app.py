@@ -425,7 +425,7 @@ def setup_events(alt_client, nickname):
         #       🔥 CATCHING LAYERS PIPELINE 🔥
     # ========================================================    
         # ─── LAYER 0: ASSISTANT BOT MONITORING ───
-        if message.author.id in [854233015475109888, 1459494731775217860]:
+        if message.author.id in [854233015475109888, 1459494731775217860, 1307910235737948252]:
             matched = get_best_match(message.content)
             if matched:
                 # --- Mention Mode Check ---
