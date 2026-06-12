@@ -348,29 +348,41 @@ def setup_events(alt_client, nickname):
                     success = await update_github_database(wrong, right)
                     await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
-        # CAPTCHA Detection
+        # CAPTCHA Detection – only lock if the captcha is for this bot
         if message.author.id == POKETWO_ID:
             low_msg = message.content.lower()
             if "captcha" in low_msg or "verify" in low_msg:
-                alt_client.captcha_locked = True
-                jump_url = message.jump_url
-                print(f"🚨 CAPTCHA on {nickname}! System isolated.", flush=True)
+                
+                match = re.search(r'captcha/(\d+)', message.content)
+                if match:
+                    targeted_user_id = int(match.group(1))
+                    if targeted_user_id == alt_client.user.id:
+                        alt_client.captcha_locked = True
+                        jump_url = message.jump_url
+                        print(f"🚨 CAPTCHA for {nickname}! System isolated.", flush=True)
+                        for admin_id in ADMIN_IDS:
+                            if admin_id == alt_client.user.id:
+                                continue
+                            try:
+                                admin_user = await alt_client.fetch_user(admin_id)
+                                await admin_user.send(
+                                    f"⚠️ **CAPTCHA ALERT**\n"
+                                    f"Bot: `{nickname}`\n"
+                                    f"🔗 **Solve here:** {jump_url}\n"
+                                    f"Status: **PAUSED**. Type `.resume` to continue."
+                                )
+                                print(f"✅ DM Alert sent to Admin: {admin_id}", flush=True)
+                            except Exception as e:
+                                print(f"❌ Could not DM Admin {admin_id}: {e}", flush=True)
+                        return
+                    else:
+                        # Captcha for another user – ignore silently (no lock)
+                        print(f"ℹ️ [{nickname}] Ignoring captcha for user {targeted_user_id} (not me).")
+                        return
+                else:
+                    print(f"⚠️ [{nickname}] Could not extract user ID from captcha. Ignoring.")
+                    return
 
-                for admin_id in ADMIN_IDS:
-                    if admin_id == alt_client.user.id:
-                        continue
-                    try:
-                        admin_user = await alt_client.fetch_user(admin_id)
-                        await admin_user.send(
-                            f"⚠️ **CAPTCHA ALERT**\n"
-                            f"Bot: `{nickname}`\n"
-                            f"🔗 **Solve here:** {jump_url}\n"
-                            f"Status: **PAUSED**. Type `.resume` to continue."
-                        )
-                        print(f"✅ DM Alert sent to Admin: {admin_id}", flush=True)
-                    except Exception as e:
-                        print(f"❌ Could not DM Admin {admin_id}: {e}", flush=True)
-                return
 
         # Gatekeeper
         if alt_client.captcha_locked:
