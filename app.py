@@ -163,7 +163,6 @@ async def click_button_by_id(message, target_msg_id, button_identifier):
     button_identifier can be either the button's label or its custom_id.
     """
     try:
-        # Fetch the target message
         target_msg = await message.channel.fetch_message(int(target_msg_id))
     except Exception as e:
         return f"❌ Could not fetch message: {e}"
@@ -173,7 +172,6 @@ async def click_button_by_id(message, target_msg_id, button_identifier):
     for component in target_msg.components:
         for child in component.children:
             if hasattr(child, 'custom_id'):
-                # Match by label or custom_id
                 if child.label == button_identifier or child.custom_id == button_identifier:
                     button = child
                     break
@@ -183,31 +181,41 @@ async def click_button_by_id(message, target_msg_id, button_identifier):
     if not button:
         return "❌ Button not found. Check the message ID and button label/custom_id."
 
-    # Build interaction payload
-    # You need your account's token for authorization; we'll use the client's token stored internally
-    token = message._state.http.token  # Access the underlying token (self-bot only)
+    # Build interaction payload (standard for self‑bots)
+    token = message._state.http.token
     interaction_payload = {
-        "type": 2,  # Message component interaction
-        "application_id": str(target_msg.author.id),  # The bot that owns the button (e.g., Pokétwo)
+        "type": 2,                               # Message component interaction
+        "application_id": str(target_msg.author.id),
         "guild_id": str(message.guild.id) if message.guild else None,
         "channel_id": str(message.channel.id),
         "message_id": str(target_msg_id),
+        "session_id": "a" * 32,                  # placeholder, usually works
         "data": {
-            "component_type": 2,  # Button component type
+            "component_type": 2,                 # button
             "custom_id": button.custom_id
         },
-        "nonce": str(random.randint(10**18, 10**19 - 1))  # Optional but mimics client behaviour
+        "message_flags": 0,
+        "nonce": str(random.randint(10**18, 10**19 - 1))
     }
 
-    # Remove guild_id if DM
     if not message.guild:
         interaction_payload.pop("guild_id")
 
-    # Headers
     headers = {
         "Authorization": token,
         "Content-Type": "application/json"
     }
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post("https://discord.com/api/v9/interactions", json=interaction_payload, headers=headers) as resp:
+                if resp.status in (200, 204):
+                    return "✅ Button clicked successfully!"
+                else:
+                    text = await resp.text()
+                    return f"❌ API error {resp.status}: {text[:200]}"
+        except Exception as e:
+            return f"❌ Request failed: {e}"
 
     # Send the POST request
     async with aiohttp.ClientSession() as session:
