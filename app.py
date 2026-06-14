@@ -157,6 +157,70 @@ async def set_spam_lock_github(status):
     except:
         return False
 
+async def click_button_by_id(message, target_msg_id, button_identifier):
+    """
+    Simulate clicking a button in a Discord message.
+    button_identifier can be either the button's label or its custom_id.
+    """
+    try:
+        # Fetch the target message
+        target_msg = await message.channel.fetch_message(int(target_msg_id))
+    except Exception as e:
+        return f"❌ Could not fetch message: {e}"
+
+    # Find the button
+    button = None
+    for component in target_msg.components:
+        for child in component.children:
+            if hasattr(child, 'custom_id'):
+                # Match by label or custom_id
+                if child.label == button_identifier or child.custom_id == button_identifier:
+                    button = child
+                    break
+        if button:
+            break
+
+    if not button:
+        return "❌ Button not found. Check the message ID and button label/custom_id."
+
+    # Build interaction payload
+    # You need your account's token for authorization; we'll use the client's token stored internally
+    token = message._state.http.token  # Access the underlying token (self-bot only)
+    interaction_payload = {
+        "type": 2,  # Message component interaction
+        "application_id": str(target_msg.author.id),  # The bot that owns the button (e.g., Pokétwo)
+        "guild_id": str(message.guild.id) if message.guild else None,
+        "channel_id": str(message.channel.id),
+        "message_id": str(target_msg_id),
+        "data": {
+            "component_type": 2,  # Button component type
+            "custom_id": button.custom_id
+        },
+        "nonce": str(random.randint(10**18, 10**19 - 1))  # Optional but mimics client behaviour
+    }
+
+    # Remove guild_id if DM
+    if not message.guild:
+        interaction_payload.pop("guild_id")
+
+    # Headers
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json"
+    }
+
+    # Send the POST request
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post("https://discord.com/api/v9/interactions", json=interaction_payload, headers=headers) as resp:
+                if resp.status in (200, 204):
+                    return "✅ Button clicked successfully!"
+                else:
+                    text = await resp.text()
+                    return f"❌ API error {resp.status}: {text[:200]}"
+        except Exception as e:
+            return f"❌ Request failed: {e}"
+            
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
     connector = aiohttp.TCPConnector(ssl=False)
@@ -279,9 +343,17 @@ def setup_events(alt_client, nickname):
                     await message.channel.send(f"<@716390085896962058> trade add {content[11:]}")
                 else:
                     await message.channel.send(f"<@716390085896962058> trade {content[7:]}")
-            elif cmd == ".ai":
-                ai_enabled = not ai_enabled
-                await message.channel.send(f"🤖 AI Vision: {'ENABLED' if ai_enabled else 'DISABLED'}")
+            
+            elif cmd.startswith(".click "):
+                parts = content.split()
+                if len(parts) != 3:
+                    await message.channel.send("❌ Usage: `.click <message_id> <button_label_or_custom_id>`")
+                    return
+                _, msg_id, button_id = parts
+                result = await click_button_by_id(message, msg_id, button_id)
+                await message.channel.send(result)
+
+            
             elif cmd == ".status":
                 s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
                 l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
