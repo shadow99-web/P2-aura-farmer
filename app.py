@@ -19,30 +19,23 @@ import json
 import unicodedata
 from config import ACCOUNTS
 
-# --- CRITICAL FIX FOR 'NoneType' object is not iterable ---
+# --- CRITICAL FIX ---
 from discord.state import ConnectionState
 
 def patched_parse_ready_supplemental(self, data):
     try:
-        self.pending_payments = {
-            int(p['id']): p for p in data.get('pending_payments') or []
-        }
+        self.pending_payments = {int(p['id']): p for p in data.get('pending_payments') or []}
     except Exception:
         self.pending_payments = {}
 
 ConnectionState.parse_ready_supplemental = patched_parse_ready_supplemental
-# ---------------------------------------------------------
 
-# --- CONFIG & GLOBALS ---
+# --- CONFIG ---
 TOKEN = os.getenv("TOKEN")
 POKENAME_BOT_ID = 874910942490677270
 POKETWO_ID = 716390085896962058
 SPAM_CHANNEL_ID = 1459841583536148601
-ADMIN_IDS = [
-    1378954077462986772,
-    876746134352183336,
-    1489464610565390336
-]
+ADMIN_IDS = [1378954077462986772, 876746134352183336, 1489464610565390336]
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "shadow99-web/P2-aura-farmer"
 FILE_PATH = "corrections.py"
@@ -51,30 +44,27 @@ spam_enabled = True
 captcha_hit = False
 manual_awake = False
 ocr_on_cooldown = False
-ai_enabled = True
+ai_enabled = True   # not used anymore, but kept for compatibility
 OCR_KEYS = ["K81439983988957", "K89035013988957", "K86412733888957"]
 SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 
-# --- IMPROVED KEEP ALIVE SERVER ---
+# --- Flask keep-alive ---
 app = Flask('')
-
 @app.route('/')
 def home():
-    return "Aura Farmer is active and healthy!"
+    return "Aura Farmer is active!"
 
 def run():
     port = int(os.environ.get("PORT", 7860))
-    try:
-        app.run(host='0.0.0.0', port=port)
-    except Exception as e:
-        print(f"⚠️ Flask Server suppressed (likely already running): {e}")
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
-    t = Thread(target=run, daemon=True)
-    t.start()
+    Thread(target=run, daemon=True).start()
 
+# --- Helper functions ---
 def is_bot_sleeping():
-    if manual_awake: return False
+    if manual_awake:
+        return False
     now_ist = datetime.now(pytz.timezone('Asia/Kolkata')).hour
     if SLEEP_START_HOUR < SLEEP_END_HOUR:
         return SLEEP_START_HOUR <= now_ist < SLEEP_END_HOUR
@@ -87,15 +77,16 @@ def solve_hint(hint_pattern):
         with open("pokemons.txt", "r") as f:
             names = f.read().splitlines()
         for name in names:
-            if re.fullmatch(regex_pattern, name, re.IGNORECASE): return name
+            if re.fullmatch(regex_pattern, name, re.IGNORECASE):
+                return name
     except Exception as e:
         print(f"File Error: {e}")
     return None
 
 def get_best_match(text):
-    if not text: return None
+    if not text:
+        return None
     raw_line = text.split('\n')[0].split(':')[0].strip().upper()
-
     prefixes_to_ignore = [
         "HISUIAN", "ALOLAN", "GALARIAN", "PALDEAN", "FIGHTING",
         "PSYCHIC", "ICE", "ZENITH", "ORIGIN", "THERIAN", "SKY",
@@ -104,17 +95,13 @@ def get_best_match(text):
         "MINT", "LEMON", "SALTED", "CUPCAKE", "DUSK", "MIDNIGHT",
         "CREAM", "BERRY", "SWEET", "LOVE", "STAR", "CLOVER", "FLOWER", "RIBBON"
     ]
-
     words = raw_line.split()
     while words and words[0] in prefixes_to_ignore:
         words.pop(0)
-
     raw_line = " ".join(words)
     clean_ocr = "".join(c for c in raw_line if c.isalnum())
-
     if clean_ocr in pokemon_map:
         return pokemon_map[clean_ocr]
-
     try:
         with open("pokemons.txt", "r") as f:
             all_names = f.read().splitlines()
@@ -129,37 +116,24 @@ def get_best_match(text):
 
 async def update_github_database(wrong, right):
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     try:
         r = requests.get(url, headers=headers)
         if r.status_code != 200:
-            print(f"❌ GitHub GET failed: {r.status_code} - {r.text}")
             return False
-
         data = r.json()
         sha = data['sha']
         content = base64.b64decode(data['content']).decode('utf-8')
         new_line = f'\npokemon_map["{wrong.upper()}"] = "{right}"'
         updated_content = content + new_line
-
         payload = {
             "message": f"Correction: {wrong} -> {right}",
             "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
             "sha": sha
         }
-
         put_r = requests.put(url, headers=headers, json=payload)
-        if put_r.status_code in [200, 201]:
-            print(f"✅ GitHub Sync Successful for {wrong}")
-            return True
-        else:
-            print(f"❌ GitHub PUT failed: {put_r.status_code}")
-            return False
-    except Exception as e:
-        print(f"⚠️ GitHub Sync System Error: {e}")
+        return put_r.status_code in [200, 201]
+    except:
         return False
 
 async def set_spam_lock_github(status):
@@ -167,19 +141,17 @@ async def set_spam_lock_github(status):
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     try:
         r = requests.get(url, headers=headers)
-        if r.status_code != 200: return False
-
+        if r.status_code != 200:
+            return False
         data = r.json()
         sha = data['sha']
         content = base64.b64decode(data['content']).decode('utf-8')
         updated_content = re.sub(r'SPAM_LOCK = .*', f'SPAM_LOCK = {status}', content)
-
         payload = {
             "message": f"Spam Lock: {status}",
             "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
             "sha": sha
         }
-
         put_r = requests.put(url, headers=headers, json=payload)
         return put_r.status_code in [200, 201]
     except:
@@ -200,15 +172,15 @@ async def get_pokemon_name(image_url):
                             name = raw_text.strip().split('\n')[0]
                             clean_name = "".join(c for c in name if c.isalpha())
                             if clean_name:
-                                print(f"🔍 OCR Success: {clean_name} (Key: {key[:5]}...)")
+                                print(f"🔍 OCR Success: {clean_name}")
                                 return clean_name
-            except Exception as e:
-                print(f"⏩ OCR Key {key[:5]} failed/timed out. Trying next...")
+            except:
                 continue
     return None
 
 async def catch_action(message, name):
-    if not name: return
+    if not name:
+        return
     if name.upper() in pokemon_map:
         name = pokemon_map[name.upper()]
     await asyncio.sleep(random.uniform(2.8, 4.5))
@@ -230,6 +202,7 @@ async def spammer_v2(alt_client):
         else:
             await asyncio.sleep(5)
 
+# --- MULTI-CLIENT HANDLER ---
 def setup_events(alt_client, nickname):
     @alt_client.event
     async def on_ready():
@@ -246,7 +219,7 @@ def setup_events(alt_client, nickname):
         if not hasattr(alt_client, 'mention_only_mode'):
             alt_client.mention_only_mode = False
 
-        # --- Block hints in mention mode ---
+        # Block hints in mention mode
         if getattr(alt_client, 'mention_only_mode', False):
             low = message.content.lower()
             if "that is the wrong pokémon" in low or "the pokémon is" in low:
@@ -255,22 +228,17 @@ def setup_events(alt_client, nickname):
 
         global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
 
-        # Self-recognition
         is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
-
         if message.author.id == alt_client.user.id:
             if not message.content.strip().startswith("."):
                 return
-
-        # Sleep logic
         if is_bot_sleeping() and not is_admin_or_self:
             return
 
-        # Admin & Self-commands
+        # Admin & self commands
         if message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id:
             content = message.content.strip()
             cmd = content.lower()
-
             if cmd == ".stop":
                 spam_enabled = False
                 await set_spam_lock_github("True")
@@ -326,11 +294,10 @@ def setup_events(alt_client, nickname):
                     success = await update_github_database(wrong, right)
                     await message.channel.send(f"✅ Correction Added" if success else "⚠️ Sync Failed")
 
-        # CAPTCHA Detection – only lock if the captcha is for this bot
+        # CAPTCHA detection – only lock if captcha is for this bot
         if message.author.id == POKETWO_ID:
             low_msg = message.content.lower()
             if "captcha" in low_msg or "verify" in low_msg:
-                
                 match = re.search(r'captcha/(\d+)', message.content)
                 if match:
                     targeted_user_id = int(match.group(1))
@@ -349,27 +316,22 @@ def setup_events(alt_client, nickname):
                                     f"🔗 **Solve here:** {jump_url}\n"
                                     f"Status: **PAUSED**. Type `.resume` to continue."
                                 )
-                                print(f"✅ DM Alert sent to Admin: {admin_id}", flush=True)
-                            except Exception as e:
-                                print(f"❌ Could not DM Admin {admin_id}: {e}", flush=True)
+                            except:
+                                pass
                         return
                     else:
-                        # Captcha for another user – ignore silently (no lock)
                         print(f"ℹ️ [{nickname}] Ignoring captcha for user {targeted_user_id} (not me).")
                         return
                 else:
                     print(f"⚠️ [{nickname}] Could not extract user ID from captcha. Ignoring.")
                     return
 
-
         # Gatekeeper
         if alt_client.captcha_locked:
             return
 
-        # ========================================================
-        #       🔥 CATCHING LAYERS PIPELINE 🔥
-        # ========================================================
-        # LAYER 0: ASSISTANT BOT MONITORING
+        # ===== CATCHING LAYERS (only Layer 0 and Layer 1) =====
+        # LAYER 0: Assistant bots
         if message.author.id in [854233015475109888, 1459494731775217860, 1307910235737948252]:
             matched = get_best_match(message.content)
             if matched:
@@ -383,7 +345,7 @@ def setup_events(alt_client, nickname):
                 alt_client.ocr_lock = False
                 return
 
-        # LAYER 1: POKENAME BOT OCR MONITORING
+        # LAYER 1: PokeName bot OCR
         elif message.author.id == POKENAME_BOT_ID:
             if getattr(alt_client, 'mention_only_mode', False):
                 if not (message.mentions and alt_client.user in message.mentions):
@@ -400,33 +362,13 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
 
-        
-
-            # Condition 2: Wrong guess -> request hint (BLOCKED in mention mode)
-            elif "that is the wrong pokémon" in low_content:
-                if not getattr(alt_client, 'mention_only_mode', False):
-                    print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
-                    await asyncio.sleep(1.0)
-                    await message.channel.send("<@716390085896962058> h")
-                else:
-                    print(f"🔇 [{nickname}] Wrong guess, but mention mode active – skipping hint.")
-
-            # Condition 3: Hint received -> solve (BLOCKED in mention mode)
-            elif "the pokémon is" in low_content:
-                if not getattr(alt_client, 'mention_only_mode', False):
-                    solved = solve_hint(message.content.split("is ")[1])
-                    if solved:
-                        print(f"💡 [{nickname}] Hint Solved: {solved}")
-                        await catch_action(message, solved)
-                else:
-                    print(f"🔇 [{nickname}] Hint received but mention mode active – skipping.")
-
+# --- BOOT LOGIC ---
 async def safe_start(client, token, nickname):
     try:
         print(f"📡 [CONNECTING] {nickname}...")
         await asyncio.wait_for(client.start(token.strip()), timeout=30.0)
     except asyncio.TimeoutError:
-        print(f"⚠️ [TIMEOUT] {nickname}: Discord ignored the request. Retrying...")
+        print(f"⚠️ [TIMEOUT] {nickname}: Retrying...")
         await asyncio.sleep(5)
         await safe_start(client, token, nickname)
     except discord.errors.LoginFailure:
@@ -437,7 +379,6 @@ async def safe_start(client, token, nickname):
 async def main_boot():
     keep_alive()
     print("🚀 SYSTEM BOOT: DIRECT CONNECTION MODE", flush=True)
-
     ACCOUNTS = []
     for i in range(1, 3):
         name = f"TOKEN{i}"
@@ -446,14 +387,12 @@ async def main_boot():
             clean_token = str(val).strip()
             if len(clean_token) > 10:
                 ACCOUNTS.append({"token": clean_token, "name": f"Alt {i}"})
-                print(f"✅ Loaded {name} (Starts with: {clean_token[:5]}...)", flush=True)
+                print(f"✅ Loaded {name}", flush=True)
         else:
-            print(f"⚠️ {name} not found in Environment Variables.", flush=True)
-
+            print(f"⚠️ {name} not found.", flush=True)
     if not ACCOUNTS:
-        print("❌ FATAL: No tokens were successfully loaded. Check Render settings!", flush=True)
+        print("❌ FATAL: No tokens loaded!", flush=True)
         return
-
     for acc in ACCOUNTS:
         print(f"📡 [HANDSHAKE] Starting {acc['name']}...", flush=True)
         try:
@@ -469,7 +408,6 @@ async def main_boot():
             await asyncio.sleep(45)
         except Exception as e:
             print(f"🛑 Error booting {acc['name']}: {e}", flush=True)
-
     while True:
         await asyncio.sleep(3600)
 
