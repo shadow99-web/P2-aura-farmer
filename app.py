@@ -185,28 +185,6 @@ async def set_spam_lock_github(status):
     except:
         return False
 
-async def query_private_onnx_api(image_url):
-    api_url = "https://discordbotnhihun-poketwo.hf.space/predict"
-    headers = {
-        "x-license-key": "jeetendraiscool",
-        "Content-Type": "application/json"
-    }
-    payload = {"imageUrl": image_url}
-
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(api_url, headers=headers, json=payload, timeout=4.0) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("status"):
-                        print(f"🧠 [ONNX AI] Model Guess: {data['name']} (Conf: {data['confidence']})", flush=True)
-                        return data["name"]
-                elif resp.status == 401:
-                    print("❌ [ONNX AI] Auth Failure! Check VALID_API_KEY inside your app.py", flush=True)
-        except Exception as e:
-            print(f"⚠️ [ONNX AI] Cloud routing delay: {e}", flush=True)
-    return None
-
 async def get_pokemon_name(image_url):
     url = "https://api.ocr.space/parse/image"
     connector = aiohttp.TCPConnector(ssl=False)
@@ -422,35 +400,7 @@ def setup_events(alt_client, nickname):
                     await catch_action(message, matched)
                     return
 
-        # LAYER 2: PRIMARY GATEWAY - POKETWO SPAWNS
-        elif message.author.id == POKETWO_ID:
-            low_content = message.content.lower()
-
-            # Condition 1: New Wild Spawn
-            # Fixed detection string to match 'A wild **Pikachu** has appeared!'
-            if "wild **" in low_content and "** has appeared" in low_content and ai_enabled:
-                # Mention Mode Check
-                if getattr(alt_client, 'mention_only_mode', False):
-                    if not (message.mentions and alt_client.user in message.mentions):
-                        print(f"ℹ️ [{nickname}] Mention-only mode active, bot not mentioned. Skipping spawn.")
-                        return
-
-                if getattr(alt_client, 'ocr_lock', False):
-                    return
-
-                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
-                if img:
-                    print(f"👁️ [{nickname}] Active Target Spawn! Processing...", flush=True)
-                    pokemon_name = await query_private_onnx_api(img)
-
-                    if pokemon_name:
-                        if pokemon_name.upper() in pokemon_map:
-                            pokemon_name = pokemon_map[pokemon_name.upper()]
-                        await catch_action(message, pokemon_name)
-                    else:
-                        print(f"⏩ [{nickname}] AI failed. No hint.")
-                        if not getattr(alt_client, 'mention_only_mode', False):
-                            await message.channel.send("<@716390085896962058> h")
+        
 
             # Condition 2: Wrong guess -> request hint (BLOCKED in mention mode)
             elif "that is the wrong pokémon" in low_content:
