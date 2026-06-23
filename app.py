@@ -180,6 +180,56 @@ async def query_private_onnx_api(image_url):
             print(f"⚠️ [Custom Naming Bot] Error: {e}", flush=True)
     return None
 
+async def extract_spawn_image(message):
+    """
+    Extract Pokémon spawn image from a Discord message.
+    Returns the image URL or None if not a spawn.
+    """
+    img_url = None
+    is_spawn = False
+
+    # 1. Check message content for spawn indicators
+    msg_content = message.content.lower() if message.content else ""
+    if "wild **" in msg_content and "** has appeared" in msg_content:
+        is_spawn = True
+
+    # 2. Deep Embed Scanning
+    if message.embeds:
+        for embed in message.embeds:
+            embed_title = embed.title.lower() if embed.title else ""
+            embed_desc = embed.description.lower() if embed.description else ""
+            author_name = embed.author.name.lower() if (embed.author and embed.author.name) else ""
+
+            # Check for spawn indicators in embed
+            if (
+                "wild pokémon has appeared" in embed_title or
+                "wild pokémon has appeared" in embed_desc or
+                "wild pokémon has appeared" in author_name or
+                "guess the pokémon" in embed_desc
+            ) or (embed.description and "#" in embed.description and "catch" in embed_desc):
+                is_spawn = True
+
+            # Extract image from Embed Image
+            if embed.image and embed.image.url:
+                img_url = embed.image.url
+            # Fallback: Extract from Embed Thumbnail
+            elif embed.thumbnail and embed.thumbnail.url:
+                img_url = embed.thumbnail.url
+
+    # 3. Attachment Scanning (for uploaded images)
+    if not img_url and message.attachments:
+        for attachment in message.attachments:
+            if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.webp']):
+                img_url = attachment.url
+                if "pokemon" in attachment.filename.lower():
+                    is_spawn = True
+
+    # 4. Override: If it's from Pokétwo's CDN, it's ALWAYS a spawn
+    if img_url and "cdn.poketwo.net/images/" in img_url:
+        is_spawn = True
+
+    return img_url if is_spawn else None
+
 async def update_github_database(wrong, right):
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -487,9 +537,12 @@ def setup_events(alt_client, nickname):
 
             guild_id_str = str(message.guild.id)
             ai_enabled_for_guild = ai_enabled_config.get(guild_id_str, False)
+            img = await extract_spawn_image(message)
+            if img and ai_enabled_for_guild:
+                print(f"👁️ [{nickname}] Spawn detected! Processing...", flush=True)
 
             # Condition 1: New Wild Spawn (AI catch)
-            if "wild **" in low_content and "** has appeared" in low_content and ai_enabled_for_guild:
+    
                 if getattr(alt_client, 'mention_only_mode', False):
                     if not (message.mentions and alt_client.user in message.mentions):
                         print(f"ℹ️ [{nickname}] Mention-only mode active, bot not mentioned. Skipping spawn.")
