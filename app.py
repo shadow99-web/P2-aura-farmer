@@ -529,20 +529,16 @@ def setup_events(alt_client, nickname):
                         return
                 else:
                     print(f"⚠️ [{nickname}] Could not extract user ID from captcha. Ignoring.")
-                    return              
-        # Gatekeeper
-        if alt_client.captcha_locked:
-            return
-
-
+                    return
+                    
             guild_id_str = str(message.guild.id)
             ai_enabled_for_guild = ai_enabled_config.get(guild_id_str, False)
-            img = await extract_spawn_image(message)
-            if img and ai_enabled_for_guild:
-                print(f"👁️ [{nickname}] Spawn detected! Processing...", flush=True)
 
-            # Condition 1: New Wild Spawn (AI catch)
-    
+            # 1) Extract spawn image (covers all spawn formats)
+            img = await extract_spawn_image(message)
+
+            # 2) If AI is enabled and we have an image → use naming bot
+            if img and ai_enabled_for_guild:
                 if getattr(alt_client, 'mention_only_mode', False):
                     if not (message.mentions and alt_client.user in message.mentions):
                         print(f"ℹ️ [{nickname}] Mention-only mode active, bot not mentioned. Skipping spawn.")
@@ -550,18 +546,17 @@ def setup_events(alt_client, nickname):
                 if getattr(alt_client, 'ocr_lock', False):
                     return
 
-                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
-                if img:
-                    print(f"👁️ [{nickname}] Active Target Spawn! Processing...", flush=True)
-                    pokemon_name = await query_private_onnx_api(img)
-                    if pokemon_name:
-                        if pokemon_name.upper() in pokemon_map:
-                            pokemon_name = pokemon_map[pokemon_name.upper()]
-                        await catch_action(message, pokemon_name)
-                    else:
-                        print(f"⏩ [{nickname}] AI failed. Falling back to hint...")
-                        if not getattr(alt_client, 'mention_only_mode', False):
-                            await message.channel.send("<@716390085896962058> h")
+                print(f"👁️ [{nickname}] Spawn detected! Processing...", flush=True)
+                pokemon_name = await query_private_onnx_api(img)
+                if pokemon_name:
+                    if pokemon_name.upper() in pokemon_map:
+                        pokemon_name = pokemon_map[pokemon_name.upper()]
+                    await catch_action(message, pokemon_name)
+                else:
+                    print(f"⏩ [{nickname}] AI failed. Falling back to hint...")
+                    if not getattr(alt_client, 'mention_only_mode', False):
+                        await message.channel.send("<@716390085896962058> h")
+
             # 3) Wrong guess → request hint
             elif "that is the wrong pokémon" in low_msg:
                 if not getattr(alt_client, 'mention_only_mode', False):
@@ -570,7 +565,7 @@ def setup_events(alt_client, nickname):
                     await message.channel.send("<@716390085896962058> h")
                 else:
                     print(f"🔇 [{nickname}] Wrong guess, but mention mode active – skipping hint.")
-            
+
             # 4) Hint received → solve it
             elif "the pokémon is" in low_msg:
                 if not getattr(alt_client, 'mention_only_mode', False):
@@ -580,6 +575,10 @@ def setup_events(alt_client, nickname):
                         await catch_action(message, solved)
                 else:
                     print(f"🔇 [{nickname}] Hint received but mention mode active – skipping.")
+
+        # ─── GATEKEEPER ───
+        if alt_client.captcha_locked:
+            return
 
         
 
