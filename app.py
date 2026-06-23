@@ -562,18 +562,17 @@ def setup_events(alt_client, nickname):
                         print(f"⏩ [{nickname}] AI failed. Falling back to hint...")
                         if not getattr(alt_client, 'mention_only_mode', False):
                             await message.channel.send("<@716390085896962058> h")
-
-            # Condition 2: Wrong guess → request hint
-            elif "that is the wrong pokémon" in low_content:
+            # 3) Wrong guess → request hint
+            elif "that is the wrong pokémon" in low_msg:
                 if not getattr(alt_client, 'mention_only_mode', False):
                     print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
                     await asyncio.sleep(1.0)
                     await message.channel.send("<@716390085896962058> h")
                 else:
                     print(f"🔇 [{nickname}] Wrong guess, but mention mode active – skipping hint.")
-
-            # Condition 3: Hint received → solve it
-            elif "the pokémon is" in low_content:
+            
+            # 4) Hint received → solve it
+            elif "the pokémon is" in low_msg:
                 if not getattr(alt_client, 'mention_only_mode', False):
                     solved = solve_hint(message.content.split("is ")[1])
                     if solved:
