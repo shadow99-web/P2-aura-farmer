@@ -3,3 +3,4 @@ aiohttp
 requests
 pytz
 flask
+huggingface_hub
