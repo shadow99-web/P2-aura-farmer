@@ -1,7 +1,7 @@
 # corrections.py
 
 # --- DATABASE CONFIG ---
-SLEEP_START_HOUR = 1
+SLEEP_START_HOUR = 2
 SLEEP_END_HOUR = 7
 
 pokemon_map = {
