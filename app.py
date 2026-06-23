@@ -364,7 +364,8 @@ def setup_events(alt_client, nickname):
                 print(f"🔇 [{nickname}] Hint ignored because mention mode is active.")
                 return
 
-        global spam_enabled, manual_awake, ai_enabled_config = load_ai_config(), SLEEP_START_HOUR, SLEEP_END_HOUR
+        global spam_enabled, manual_awake, ai_enabled_config, SLEEP_START_HOUR, SLEEP_END_HOUR
+        ai_enabled_config = load_ai_config()
 
         is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
         if message.author.id == alt_client.user.id:
