@@ -18,6 +18,7 @@ from io import BytesIO
 import json
 import unicodedata
 from config import ACCOUNTS
+from huggingface_hub import HfApi, upload_file, hf_hub_download
 
 # --- CRITICAL FIX ---
 from discord.state import ConnectionState
@@ -39,6 +40,8 @@ ADMIN_IDS = [1378954077462986772, 876746134352183336, 1489464610565390336]
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "shadow99-web/P2-aura-farmer"
 FILE_PATH = "corrections.py"
+AI_CONFIG_FILE = "server_ai_config.json"
+HF_TOKEN = os.getenv("HF_TOKEN")  # Use the same token as spawn tracker
 
 spam_enabled = True
 captcha_hit = False
@@ -113,6 +116,69 @@ def get_best_match(text):
     except:
         pass
     return raw_line if raw_line else None
+
+
+# ─── AI CONFIG (per‑server toggle) ───
+hf_api = HfApi()
+
+def load_ai_config():
+    """Load per‑server AI config from Hugging Face dataset."""
+    try:
+        path = hf_hub_download(
+            repo_id="DiscordBOTNHIHUN/P2AURA-FARMER",
+            filename=AI_CONFIG_FILE,
+            repo_type="dataset",
+            token=HF_TOKEN
+        )
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_ai_config(config):
+    """Save per‑server AI config to Hugging Face dataset."""
+    with open(AI_CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+    try:
+        upload_file(
+            path_or_fileobj=AI_CONFIG_FILE,
+            path_in_repo=AI_CONFIG_FILE,
+            repo_id="DiscordBOTNHIHUN/P2AURA-FARMER",
+            repo_type="dataset",
+            token=HF_TOKEN
+        )
+        print("☁️ [HF] AI config synced.")
+    except Exception as e:
+        print(f"❌ HF upload failed: {e}")
+        
+async def query_private_onnx_api(image_url):
+    """Queries your custom naming bot hosted on Hugging Face Space."""
+    api_url = "https://discordbotnhihun-naming.hf.space/predict"
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
+    payload = {"imageUrl": image_url}
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(api_url, headers=headers, json=payload, timeout=5.0) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("status") is True:
+                        name = data.get("name")
+                        confidence = data.get("confidence", 0)
+                        print(f"🧠 [Custom Naming Bot] {name} (Conf: {confidence})", flush=True)
+                        return name
+                    else:
+                        print(f"⚠️ [Custom Naming Bot] API returned error: {data}", flush=True)
+                else:
+                    print(f"⚠️ [Custom Naming Bot] HTTP {resp.status}", flush=True)
+        except asyncio.TimeoutError:
+            print("⏱️ [Custom Naming Bot] Request timed out.", flush=True)
+        except Exception as e:
+            print(f"⚠️ [Custom Naming Bot] Error: {e}", flush=True)
+    return None
 
 async def update_github_database(wrong, right):
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
@@ -298,7 +364,7 @@ def setup_events(alt_client, nickname):
                 print(f"🔇 [{nickname}] Hint ignored because mention mode is active.")
                 return
 
-        global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
+        global spam_enabled, manual_awake, ai_enabled_config = load_ai_config(), SLEEP_START_HOUR, SLEEP_END_HOUR
 
         is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
         if message.author.id == alt_client.user.id:
@@ -360,12 +426,20 @@ def setup_events(alt_client, nickname):
                 _, msg_id, button_id = parts
                 result = await click_button_by_id(message, msg_id, button_id)
                 await message.channel.send(result)
-
-            
             elif cmd == ".status":
                 s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
                 l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
-                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}`")
+                guild_id_str = str(message.guild.id)
+                ai_status = "🟢 ON" if ai_enabled_config.get(guild_id_str, False) else "🔴 OFF"
+                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{ai_status}`")
+            elif cmd == ".ai":
+                guild_id_str = str(message.guild.id)
+                current = ai_enabled_config.get(guild_id_str, False)
+                ai_enabled_config[guild_id_str] = not current
+                save_ai_config(ai_enabled_config)
+                status = "ENABLED" if not current else "DISABLED"
+                await message.channel.send(f"🤖 AI catching has been **{status}** in this server.")")
+          
             elif cmd.startswith(".add "):
                 parts = content.split(" ")
                 if len(parts) >= 3:
@@ -441,6 +515,48 @@ def setup_events(alt_client, nickname):
                 if matched:
                     await catch_action(message, matched)
                     return
+                
+        elif message.author.id == POKETWO_ID:
+            low_content = message.content.lower()
+    
+    # --- Condition 1: New Wild Spawn ---
+        guild_id_str = str(message.guild.id)
+        if "wild **" in low_content and "** has appeared" in low_content and ai_enabled_config.get(guild_id_str, False):
+            if getattr(alt_client, 'mention_only_mode', False):
+                if not (message.mentions and alt_client.user in message.mentions):
+                    print(f"ℹ️ [{nickname}] Mention-only mode active, bot not mentioned. Skipping spawn.")
+                    return
+                if getattr(alt_client, 'ocr_lock', False):
+                    return
+                img = message.embeds[0].image.url if (message.embeds and message.embeds[0].image) else None
+                if img:
+                    print(f"👁️ [{nickname}] Active Target Spawn! Processing...", flush=True)
+                    pokemon_name = await query_private_onnx_api(img)
+                    if pokemon_name:
+                        if pokemon_name.upper() in pokemon_map:
+                            pokemon_name = pokemon_map[pokemon_name.upper()]  
+                            await catch_action(message, pokemon_name)
+                        else:
+                            print(f"⏩ [{nickname}] AI failed ")
+                            
+    # --- Condition 2: Wrong guess → request hint ---
+    elif "that is the wrong pokémon" in low_content:
+        if not getattr(alt_client, 'mention_only_mode', False):
+            print(f"❌ [{nickname}] Guess was wrong. Forcing Hint...")
+            await asyncio.sleep(1.0)
+            await message.channel.send("<@716390085896962058> h")
+        else:
+            print(f"🔇 [{nickname}] Wrong guess, but mention mode active – skipping hint.")
+    
+    # --- Condition 3: Hint received → solve it ---
+    elif "the pokémon is" in low_content:
+        if not getattr(alt_client, 'mention_only_mode', False):
+            solved = solve_hint(message.content.split("is ")[1])
+            if solved:
+                print(f"💡 [{nickname}] Hint Solved: {solved}")
+                await catch_action(message, solved)
+        else:
+            print(f"🔇 [{nickname}] Hint received but mention mode active – skipping.")
 
 # --- BOOT LOGIC ---
 async def safe_start(client, token, nickname):
