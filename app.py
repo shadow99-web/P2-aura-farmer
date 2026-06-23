@@ -438,7 +438,7 @@ def setup_events(alt_client, nickname):
                 ai_enabled_config[guild_id_str] = not current
                 save_ai_config(ai_enabled_config)
                 status = "ENABLED" if not current else "DISABLED"
-                await message.channel.send(f"🤖 AI catching has been **{status}** in this server.")")
+                await message.channel.send(f"🤖 AI catching has been **{status}** in this server.")
           
             elif cmd.startswith(".add "):
                 parts = content.split(" ")
