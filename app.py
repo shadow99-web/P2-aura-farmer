@@ -481,6 +481,11 @@ def setup_events(alt_client, nickname):
             elif cmd == ".status":
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
+                    try:
+                        channel_id = message.chanel.id if mesaage.channel else None
+                    except Attribute error:
+                        channel_id = None
+                    
                     # Check if we have a channel ID
                     if not message.channel_id:
                         await message.channel.send("❌ Could not determine channel ID.")
@@ -516,6 +521,11 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
+                    try:
+                        channel_id = message.chanel.id if mesaage.channel else None
+                    except Attribute error:
+                        channel_id = None                
+                 
                     # Check if we have a channel ID
                     if not message.channel_id:
                         await message.channel.send("❌ Could not determine channel ID.")
