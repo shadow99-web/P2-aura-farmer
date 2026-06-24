@@ -481,13 +481,17 @@ def setup_events(alt_client, nickname):
             elif cmd == ".status":
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
-                    if not message.guild:
-                        await message.channel.send("This command is for server only")
+                    # Fetch channel from API to get guild info (like cloner pattern)
+                    channel = await alt_client.fetch_channel(message.channel.id)
+                    guild = channel.guild
+                    
+                    if not guild:
+                        await message.channel.send("❌ Could not find guild.")
                         return
                         
                     s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
                     l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
-                    guild = await alt_client.fetch_guild(message.channel.guild.id)
+            
                     guild_id_str = str(message.guild.id)
                     ai_status = "🟢 ON" if ai_enabled_config.get(guild_id_str, False) else "🔴 OFF"
                     await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{ai_status}`")
@@ -497,11 +501,15 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
-                    if not message.guild:
-                        await message.channel.send("This command is for server only")
+                    # Fetch channel from API to get guild info (like cloner pattern)
+                    channel = await alt_client.fetch_channel(message.channel.id)
+                    guild = channel.guild
+                    
+                    if not guild:
+                        await message.channel.send("❌ Could not find guild.")
                         return
                     
-                    guild = await alt_client.fetch_guild(message.channel.guild.id)    
+                        
                     guild_id_str = str(message.guild.id)
                     current = ai_enabled_config.get(guild_id_str, False)
                     ai_enabled_config[guild_id_str] = not current
