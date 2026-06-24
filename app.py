@@ -481,14 +481,23 @@ def setup_events(alt_client, nickname):
             elif cmd == ".status":
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
-                    # Fetch channel from API to get guild info (like cloner pattern)
-                    guild_id = getattr(message.channel, 'guild_id', None)
+                    # 🧠 Improved guild ID extraction (friend's suggestion)
+                    if message.channel is not None:
+                        guild_id = getattr(message.channel, 'guild_id', None)
+                    else:
+                        guild_id = None
+
                     if not guild_id:
-                        channel = await alt_client.fetch_channel(message.channel.id)
-                        guild_id = channel.guild.id if channel.guild else None
-                    
-                    if not guild:
-                        await message.channel.send("❌ Could not find guild.")
+                        try:
+                            # Use message.channel_id directly (always available)
+                            channel = await alt_client.fetch_channel(message.channel_id)
+                            guild_id = channel.guild.id if (channel and channel.guild) else None
+                        except Exception as e:
+                            print(f"❌ Failed to fetch channel via API: {e}")
+                            guild_id = None
+
+                    if not guild_id:
+                        await message.channel.send("❌ This command can only be used in a server channel.")
                         return
                         
                     s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
@@ -503,13 +512,23 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
-                    guild_id = getattr(message.channel, 'guild_id', None)
+                    # 🧠 Improved guild ID extraction (friend's suggestion)
+                    if message.channel is not None:
+                        guild_id = getattr(message.channel, 'guild_id', None)
+                    else:
+                        guild_id = None
+
                     if not guild_id:
-                        channel = await alt_client.fetch_channel(message.channel.id)
-                        guild_id = channel.guild.id if channel.guild else None
-                    
-                    if not guild:
-                        await message.channel.send("❌ Could not find guild.")
+                        try:
+                            # Use message.channel_id directly (always available)
+                            channel = await alt_client.fetch_channel(message.channel_id)
+                            guild_id = channel.guild.id if (channel and channel.guild) else None
+                        except Exception as e:
+                            print(f"❌ Failed to fetch channel via API: {e}")
+                            guild_id = None
+
+                    if not guild_id:
+                        await message.channel.send("❌ This command can only be used in a server channel.")
                         return
                     
                         
