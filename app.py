@@ -482,8 +482,10 @@ def setup_events(alt_client, nickname):
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
                     # Fetch channel from API to get guild info (like cloner pattern)
-                    channel = await alt_client.fetch_channel(message.channel.id)
-                    guild = channel.guild
+                    guild_id = getattr(message.channel, 'guild_id', None)
+                    if not guild_id:
+                        channel = await alt_client.fetch_channel(message.channel.id)
+                        guild_id = channel.guild.id if channel.guild else None
                     
                     if not guild:
                         await message.channel.send("❌ Could not find guild.")
@@ -501,9 +503,10 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
-                    # Fetch channel from API to get guild info (like cloner pattern)
-                    channel = await alt_client.fetch_channel(message.channel.id)
-                    guild = channel.guild
+                    guild_id = getattr(message.channel, 'guild_id', None)
+                    if not guild_id:
+                        channel = await alt_client.fetch_channel(message.channel.id)
+                        guild_id = channel.guild.id if channel.guild else None
                     
                     if not guild:
                         await message.channel.send("❌ Could not find guild.")
