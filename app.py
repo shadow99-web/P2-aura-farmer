@@ -482,7 +482,7 @@ def setup_events(alt_client, nickname):
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
                     try:
-                        channel_id = message.chanel.id if message.channel else None
+                        channel_id = message.channel.id if message.channel else None
                     except AttributeError:
                         channel_id = None
                     
@@ -522,7 +522,7 @@ def setup_events(alt_client, nickname):
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
                     try:
-                        channel_id = message.chanel.id if message.channel else None
+                        channel_id = message.channel.id if message.channel else None
                     except AttributeError:
                         channel_id = None                
                  
