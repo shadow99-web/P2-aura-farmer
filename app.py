@@ -18,7 +18,7 @@ from io import BytesIO
 import json
 import unicodedata
 from config import ACCOUNTS
-from huggingface_hub import HfApi, upload_file, hf_hub_download
+
 
 # --- CRITICAL FIX ---
 from discord.state import ConnectionState
@@ -40,8 +40,7 @@ ADMIN_IDS = [1378954077462986772, 876746134352183336, 1489464610565390336]
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = "shadow99-web/P2-aura-farmer"
 FILE_PATH = "corrections.py"
-AI_CONFIG_FILE = "server_ai_config.json"
-HF_TOKEN = os.getenv("HF_TOKEN")  # Use the same token as spawn tracker
+ai_enabled = False  # Global AI toggle
 
 spam_enabled = True
 captcha_hit = False
@@ -118,38 +117,6 @@ def get_best_match(text):
     return raw_line if raw_line else None
 
 
-# ─── AI CONFIG (per‑server toggle) ───
-hf_api = HfApi()
-
-def load_ai_config():
-    """Load per‑server AI config from Hugging Face dataset."""
-    try:
-        path = hf_hub_download(
-            repo_id="DiscordBOTNHIHUN/P2AURA-FARMER",
-            filename=AI_CONFIG_FILE,
-            repo_type="dataset",
-            token=HF_TOKEN
-        )
-        with open(path, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def save_ai_config(config):
-    """Save per‑server AI config to Hugging Face dataset."""
-    with open(AI_CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
-    try:
-        upload_file(
-            path_or_fileobj=AI_CONFIG_FILE,
-            path_in_repo=AI_CONFIG_FILE,
-            repo_id="DiscordBOTNHIHUN/P2AURA-FARMER",
-            repo_type="dataset",
-            token=HF_TOKEN
-        )
-        print("☁️ [HF] AI config synced.")
-    except Exception as e:
-        print(f"❌ HF upload failed: {e}")
         
 async def query_private_onnx_api(image_url):
     """Queries your custom naming bot hosted on Hugging Face Space."""
@@ -414,8 +381,8 @@ def setup_events(alt_client, nickname):
                 print(f"🔇 [{nickname}] Hint ignored because mention mode is active.")
                 return
 
-        global spam_enabled, manual_awake, ai_enabled_config, SLEEP_START_HOUR, SLEEP_END_HOUR
-        ai_enabled_config = load_ai_config()
+        global spam_enabled, manual_awake, ai_enabled, SLEEP_START_HOUR, SLEEP_END_HOUR
+    
 
         is_admin_or_self = message.author.id in ADMIN_IDS or message.author.id == alt_client.user.id
         if message.author.id == alt_client.user.id:
@@ -477,87 +444,19 @@ def setup_events(alt_client, nickname):
                 _, msg_id, button_id = parts
                 result = await click_button_by_id(message, msg_id, button_id)
                 await message.channel.send(result)
-                
+
             elif cmd == ".status":
-                try:
-                    print(f"🔍 [DEBUG] .status command triggered for {nickname}")
-                    try:
-                        channel_id = message.channel.id if message.channel else None
-                    except AttributeError:
-                        channel_id = None
-                    
-                    # Check if we have a channel ID
-                    if not message.channel_id:
-                        await message.channel.send("❌ Could not determine channel ID.")
-                        return                    
-                    # 🧠 Improved guild ID extraction (friend's suggestion)
-                    if message.channel is not None:
-                        guild_id = getattr(message.channel, 'guild_id', None)
-                    else:
-                        guild_id = None
-
-                    if not guild_id:
-                        try:
-                            # Use message.channel_id directly (always available)
-                            channel = await alt_client.fetch_channel(message.channel_id)
-                            guild_id = channel.guild.id if (channel and channel.guild) else None
-                        except Exception as e:
-                            print(f"❌ Failed to fetch channel via API: {e}")
-                            guild_id = None
-
-                    if not guild_id:
-                        await message.channel.send("❌ This command can only be used in a server channel.")
-                        return
-                        
-                    s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
-                    l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
-            
-                    guild_id_str = str(message.guild.id)
-                    ai_status = "🟢 ON" if ai_enabled_config.get(guild_id_str, False) else "🔴 OFF"
-                    await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{ai_status}`")
-                except Exception as e:
-                    print(f"❌ [DEBUG] .status error: {e}")
-
+                s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
+                l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
+                await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{'✅ ON' if ai_enabled else '❌ OFF'}`")
+          
             elif cmd == ".ai":
-                try:
-                    print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
-                    try:
-                        channel_id = message.channel.id if message.channel else None
-                    except AttributeError:
-                        channel_id = None                
-                 
-                    # Check if we have a channel ID
-                    if not message.channel_id:
-                        await message.channel.send("❌ Could not determine channel ID.")
-                        return                    
-                    # 🧠 Improved guild ID extraction (friend's suggestion)
-                    if message.channel is not None:
-                        guild_id = getattr(message.channel, 'guild_id', None)
-                    else:
-                        guild_id = None
-
-                    if not guild_id:
-                        try:
-                            # Use message.channel_id directly (always available)
-                            channel = await alt_client.fetch_channel(message.channel_id)
-                            guild_id = channel.guild.id if (channel and channel.guild) else None
-                        except Exception as e:
-                            print(f"❌ Failed to fetch channel via API: {e}")
-                            guild_id = None
-
-                    if not guild_id:
-                        await message.channel.send("❌ This command can only be used in a server channel.")
-                        return
-                    
-                        
-                    guild_id_str = str(message.guild.id)
-                    current = ai_enabled_config.get(guild_id_str, False)
-                    ai_enabled_config[guild_id_str] = not current
-                    save_ai_config(ai_enabled_config)
-                    status = "ENABLED" if not current else "DISABLED"
-                    await message.channel.send(f"🤖 AI catching has been **{status}** in this server.")
-                except Exception as e:
-                    print(f"❌ [DEBUG] .ai error: {e}")
+                global ai_enabled
+                ai_enabled = not ai_enabled
+                status = "ENABLED" if ai_enabled else "DISABLED"
+                await message.channel.send(f"🤖 AI catching has been **{status}** globally.")
+                
+            
           
             elif cmd.startswith(".add "):
                 parts = content.split(" ")
@@ -599,14 +498,12 @@ def setup_events(alt_client, nickname):
                     print(f"⚠️ [{nickname}] Could not extract user ID from captcha. Ignoring.")
                     return
                     
-            guild_id_str = str(message.guild.id)
-            ai_enabled_for_guild = ai_enabled_config.get(guild_id_str, False)
 
             # 1) Extract spawn image (covers all spawn formats)
             img = await extract_spawn_image(message)
 
             # 2) If AI is enabled and we have an image → use naming bot
-            if img and ai_enabled_for_guild:
+            if img and ai_enabled:
                 if getattr(alt_client, 'mention_only_mode', False):
                     if not (message.mentions and alt_client.user in message.mentions):
                         print(f"ℹ️ [{nickname}] Mention-only mode active, bot not mentioned. Skipping spawn.")
