@@ -479,7 +479,7 @@ def setup_events(alt_client, nickname):
                 await message.channel.send(result)
                 
             elif cmd == ".status":       
-            try:
+             try:
                 print(f"🔍 [DEBUG] .status command triggered for {nickname}")
                 s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
                 l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
@@ -490,7 +490,7 @@ def setup_events(alt_client, nickname):
                     print(f"❌ [DEBUG] .status error: {e}")
         
             elif cmd == ".ai":
-            try:
+             try:
                 print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
                 guild_id_str = str(message.guild.id)
                 current = ai_enabled_config.get(guild_id_str, False)
