@@ -481,6 +481,10 @@ def setup_events(alt_client, nickname):
             elif cmd == ".status":
                 try:
                     print(f"🔍 [DEBUG] .status command triggered for {nickname}")
+                    # Check if we have a channel ID
+                    if not message.channel_id:
+                        await message.channel.send("❌ Could not determine channel ID.")
+                        return                    
                     # 🧠 Improved guild ID extraction (friend's suggestion)
                     if message.channel is not None:
                         guild_id = getattr(message.channel, 'guild_id', None)
@@ -512,6 +516,10 @@ def setup_events(alt_client, nickname):
             elif cmd == ".ai":
                 try:
                     print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
+                    # Check if we have a channel ID
+                    if not message.channel_id:
+                        await message.channel.send("❌ Could not determine channel ID.")
+                        return                    
                     # 🧠 Improved guild ID extraction (friend's suggestion)
                     if message.channel is not None:
                         guild_id = getattr(message.channel, 'guild_id', None)
