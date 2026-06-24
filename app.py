@@ -45,8 +45,7 @@ ai_enabled = False  # Global AI toggle
 spam_enabled = True
 captcha_hit = False
 manual_awake = False
-ocr_on_cooldown = False
-ai_enabled = True   # not used anymore, but kept for compatibility
+ocr_on_cooldown = False   
 OCR_KEYS = ["K81439983988957", "K89035013988957", "K86412733888957"]
 SPAM_MESSAGES = ["vroom vroom", "mining time", "keep going", "catch them all"]
 
@@ -451,7 +450,6 @@ def setup_events(alt_client, nickname):
                 await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{'✅ ON' if ai_enabled else '❌ OFF'}`")
           
             elif cmd == ".ai":
-                global ai_enabled
                 ai_enabled = not ai_enabled
                 status = "ENABLED" if ai_enabled else "DISABLED"
                 await message.channel.send(f"🤖 AI catching has been **{status}** globally.")
