@@ -478,15 +478,19 @@ def setup_events(alt_client, nickname):
                 result = await click_button_by_id(message, msg_id, button_id)
                 await message.channel.send(result)
                 
-            elif cmd == ".status":
+            elif cmd == ".status":       
+            try:
                 print(f"🔍 [DEBUG] .status command triggered for {nickname}")
                 s = "💤 Sleeping" if is_bot_sleeping() else "🏹 Hunting"
                 l = "🔒 LOCKED" if alt_client.captcha_locked else "🔓 Active"
                 guild_id_str = str(message.guild.id)
                 ai_status = "🟢 ON" if ai_enabled_config.get(guild_id_str, False) else "🔴 OFF"
                 await message.channel.send(f"📊 [{nickname}] Mode: `{s}` | Captcha: `{l}` | Spammer: `{'On' if spam_enabled else 'Off'}` | AI: `{ai_status}`")
-                
+        except Exception as e:
+                    print(f"❌ [DEBUG] .status error: {e}")
+        
             elif cmd == ".ai":
+            try:
                 print(f"🔍 [DEBUG] .ai command triggered for {nickname}")
                 guild_id_str = str(message.guild.id)
                 current = ai_enabled_config.get(guild_id_str, False)
@@ -494,6 +498,8 @@ def setup_events(alt_client, nickname):
                 save_ai_config(ai_enabled_config)
                 status = "ENABLED" if not current else "DISABLED"
                 await message.channel.send(f"🤖 AI catching has been **{status}** in this server.")
+        except Exception as e:
+                    print(f"❌ [DEBUG] .ai error: {e}")
           
             elif cmd.startswith(".add "):
                 parts = content.split(" ")
