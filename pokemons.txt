@@ -39,6 +39,8 @@ ninetales
 jigglypuff
 wigglytuff
 zubat
+mosslax
+peakychu
 golbat
 oddish
 gloom
